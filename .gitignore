@@ -1,6 +1,7 @@
-model/
-data/
+/model/
+/data/
 __pycache__/
 .ipynb_checkpoints
 .Trash-0
 .autodl
+/test.py
