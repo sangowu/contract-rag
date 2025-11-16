@@ -1,0 +1,36 @@
+# Core dependencies
+langchain
+langchain-community
+chromadb
+accelerate
+bitsandbytes
+vllm
+
+# Models & Embeddings
+transformers
+sentence-transformers
+torch
+
+# Retrieval
+rank-bm25
+pyserini
+
+# API & UI
+fastapi
+uvicorn
+gradio
+
+# Data processing
+pypdf
+python-docx
+pandas
+numpy
+
+# Utilities
+python-dotenv
+pyyaml
+tqdm
+loguru
+
+# Evaluation
+scikit-learn
