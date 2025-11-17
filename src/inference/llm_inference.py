@@ -10,22 +10,13 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map="auto",
     )
 
-def llm_generate(prompt: str) -> str:
+def llm_generate(full_prompt: str) -> str:
     """
     Generate the answer based on the prompt.
     """
-    retrieved_chunks = retrieve_top_k(prompt, k=10)
-    chunk_texts = [chunk[1] for chunk in retrieved_chunks]
-    context = "\n\n".join(chunk_texts)
-
-    rag_prompt = f"""
-    Question: {prompt}
-    Relevant contract clauses: {context}
-    Answer as concisely as possible.
-    """
     messages = [
         {"role": "system", "content": "You are a helpful contract review assistant."},
-        {"role": "user", "content": rag_prompt}
+        {"role": "user", "content": full_prompt}
     ]
     text = tokenizer.apply_chat_template(
         messages,

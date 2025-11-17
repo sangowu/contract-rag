@@ -1,9 +1,12 @@
 import pandas as pd
-from typing import List, Tuple
+from typing import List, Dict
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 import chromadb
+import re
+import unicodedata
 import os
+import ast
 
 CHUNK_PATH = "/root/autodl-tmp/data/processed/CUAD_v1/cuad_v1_chunks.csv"
 GOLD_ANSWERS_PATH = "/root/autodl-tmp/data/answers/CUAD_v1/cuad_v1_gold_answers.csv"
@@ -27,63 +30,102 @@ def get_collection():
         _collection = chroma_client.get_collection(name="cuad_chunks")
     return _collection
 
+def normalize_text(s: str) -> str:
+    if not isinstance(s, str):
+        s = str(s)
+    s = unicodedata.normalize("NFKC", s)
+    s = s.replace("\u00a0", " ")
+    s = re.sub(r"\s+", " ", s.strip())
+    return s.lower()
+
 def initialize_embeddings():
     df_chunk = pd.read_csv(CHUNK_PATH)
 
     model = SentenceTransformer(EMBEDDING_MODEL)
-    chunk_ids = df_chunk['chunk_id'].tolist()
-    chunk_texts = df_chunk['clause_text'].tolist()
+    chunk_ids = df_chunk['chunk_id'].astype(str).tolist()
+    file_names = df_chunk['file_name'].astype(str).tolist()
+    clause_types = df_chunk['clause_type'].astype(str).tolist()
+
+    chunk_texts = []
+    for text in df_chunk['clause_text']:
+        try:
+            items = ast.literal_eval(text)
+            if isinstance(items, list):
+                natural_text = ", ".join(str(item) for item in items)
+            else:
+                natural_text = str(text)
+        except:
+            natural_text = str(text)
+        chunk_texts.append(normalize_text(natural_text))
 
     embeddings = model.encode(
         chunk_texts,
-        batch_size=32,
+        batch_size=64,
         show_progress_bar=True,
         normalize_embeddings=True,
+        convert_to_numpy=True,
         )
 
     collection = chroma_client.get_or_create_collection(name="cuad_chunks")
-    if collection.count() == 0:
-        batch_size = 4096
-        total_items = len(chunk_ids)
-        logger.info(f"Adding {total_items} embeddings in batches of {batch_size}")
 
-        for i in range(0, total_items, batch_size):
-            end_idx  = min(i + batch_size, total_items)
-            batch_embeddings = embeddings[i:end_idx].tolist()
-            batch_metadatas = [
-                {"chunk_id": cid, "clause_text": text} for cid, text in zip(chunk_ids[i:end_idx], chunk_texts[i:end_idx])
-            ]
-            batch_ids = chunk_ids[i:end_idx]
+    batch_size = 4096
+    total_items = len(chunk_ids)
+    logger.info(f"Upserting {total_items} embeddings in batches of {batch_size}")
 
-            collection.add(
-                embeddings=batch_embeddings,
-                metadatas=batch_metadatas,
-                ids=batch_ids,
-            )
-            logger.info(f"Added batch {i//batch_size + 1}: items {i} to {end_idx-1}")
+    for i in range(0, total_items, batch_size):
+        j = min(i + batch_size, total_items)
+        collection.upsert(
+            ids=chunk_ids[i:j],                     
+            embeddings=embeddings[i:j].tolist(),    
+            metadatas=[
+                {
+                    "chunk_id": chunk_ids[k],
+                    "file_name": file_names[k],      
+                    "clause_type": clause_types[k],   
+                    "clause_text": chunk_texts[k],    
+                }
+                for k in range(i, j)
+            ],
+        )
+        logger.info(f"Upserted items {i}..{j-1}")
 
-        logger.success(f"Added {total_items} embeddings to ChromaDB")
-    else:
-        logger.info("Embeddings already exist in ChromaDB, skipping addition")
+    logger.success(f"Upserted {total_items} embeddings to ChromaDB")
 
-def retrieve_top_k(query: str, k: int = 10) -> List[List[str]]:
+def retrieve_top_k(
+    query: str,
+    k: int = 10,
+    file_name: str | None = None,
+    top_k_retrieval: int = 100,
+) -> List[Dict[str, str]]:
     try:
         model = get_model()
         collection = get_collection()
         q_emb = model.encode([query], normalize_embeddings=True)[0]
+
+        where = {"file_name": file_name} if file_name else None
         
         results = collection.query(
             query_embeddings=[q_emb.tolist()],
-            n_results=k,
+            n_results=max(k, top_k_retrieval),
             include=['metadatas'],
+            where=where,
         )
         
-        chunk_ids = results['ids'][0]
-        chunk_texts = [meta['clause_text'] for meta in results['metadatas'][0]]
+        ids   = results["ids"][0]
+        metas = results["metadatas"][0]
 
-        chunks = [{"chunk_id": chunk_id, "clause_text": chunk_text} for chunk_id, chunk_text in zip(chunk_ids, chunk_texts)]
-        
-        return chunks
+        ids   = ids[:k]
+        metas = metas[:k]
+
+        return [
+            {
+                "chunk_id": cid,
+                "clause_text": m.get("clause_text", ""),
+                "file_name": m.get("file_name", ""),
+                "clause_type": m.get("clause_type", ""),
+            }
+            for cid, m in zip(ids, metas)
+        ]
     except Exception as e:
         logger.error(f"Error during retrieval: {e}")
         return []
@@ -93,10 +135,12 @@ if __name__ == "__main__":
     df_gold_answers = pd.read_csv(GOLD_ANSWERS_PATH)
     row = df_gold_answers.iloc[0]
     gold_answer = row['gold_answer_text']
-    gold_chunk_ids = row['gold_chunk_ids']
+    gold_chunk_ids = ast.literal_eval(row['gold_chunk_ids']) if isinstance(row['gold_chunk_ids'], str) else row['gold_chunk_ids']
     query = row['query']
-    topk_chunks = retrieve_top_k(query, k=10)
-    logger.info(f"Top 10 chunk ids: {topk_chunks}")
+    file_name = row['file_name']
+    topk_chunks = retrieve_top_k(query, k=10, file_name=file_name)
+
+    logger.info(f"Top chunk id: {topk_chunks[0]['chunk_id']}")
+    logger.info(f"Gold chunk id: {gold_chunk_ids}")
     logger.info(f"Gold answer: {gold_answer}")
-    logger.info(f"Gold chunk ids: {gold_chunk_ids}")
     logger.info(f"Query: {query}")

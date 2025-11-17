@@ -38,7 +38,7 @@ CATEGORY_META = {
         "group": 1,
     },
     # 7
-    "Notice to Terminate Renewal": {
+    "Notice Period To Terminate Renewal": {
         "answer_type": ANSWER_TYPE_DURATION,
         "group": 1,
     },
@@ -63,7 +63,7 @@ CATEGORY_META = {
         "group": 2,
     },
     # 12
-    "No-Solicit of Customers": {
+    "No-Solicit Of Customers": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": 2,
     },
@@ -73,7 +73,7 @@ CATEGORY_META = {
         "group": 2,
     },
     # 14
-    "No-Solicit of Employees": {
+    "No-Solicit Of Employees": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": None,
     },
@@ -83,17 +83,17 @@ CATEGORY_META = {
         "group": None,
     },
     # 16
-    "Termination for Convenience": {
+    "Termination For Convenience": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": None,
     },
     # 17
-    "Right of First Refusal, Offer or Negotiation (ROFR/ROFO/ROFN)": {
+    "Rofr/Rofo/Rofn": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": None,
     },
     # 18
-    "Change of Control": {
+    "Change Of Control": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": 3,
     },
@@ -108,7 +108,7 @@ CATEGORY_META = {
         "group": None,
     },
     # 21
-    "Price Restriction": {
+    "Price Restrictions": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": None,
     },
@@ -123,12 +123,12 @@ CATEGORY_META = {
         "group": None,
     },
     # 24
-    "IP Ownership Assignment": {
+    "Ip Ownership Assignment": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": None,
     },
     # 25
-    "Joint IP Ownership": {
+    "Joint Ip Ownership": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": None,
     },
@@ -143,22 +143,22 @@ CATEGORY_META = {
         "group": 4,
     },
     # 28
-    "Affiliate IP License-Licensor": {
+    "Affiliate License-Licensor": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": 4,
     },
     # 29
-    "Affiliate IP License-Licensee": {
+    "Affiliate License-Licensee": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": 4,
     },
     # 30
-    "Unlimited/All-You-Can-Eat License": {
+    "Unlimited/All-You-Can-Eat-License": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": None,
     },
     # 31
-    "Irrevocable or Perpetual License": {
+    "Irrevocable Or Perpetual License": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": 4,
     },
@@ -183,7 +183,7 @@ CATEGORY_META = {
         "group": 5,
     },
     # 36
-    "Cap on Liability": {
+    "Cap On Liability": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": 5,
     },
@@ -203,7 +203,7 @@ CATEGORY_META = {
         "group": None,
     },
     # 40
-    "Covenant Not to Sue": {
+    "Covenant Not To Sue": {
         "answer_type": ANSWER_TYPE_BOOL,
         "group": None,
     },

@@ -3,6 +3,10 @@ import os
 import pandas as pd
 from tqdm import tqdm
 from loguru import logger
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.query_builder import build_query
+
 
 def load_data_csv(data_path):
     df = pd.read_csv(data_path)
@@ -33,7 +37,6 @@ class RawToChunkRecordsProcessor:
     def process(self) -> pd.DataFrame:
         for idx, row in tqdm(self.df_chunks.iterrows(), total=len(self.df_chunks)):
             filename = row['Filename']
-            document_name = row['Document Name']
 
             for col in self.clause_text_cols:
                 text = row[col]
@@ -46,16 +49,21 @@ class RawToChunkRecordsProcessor:
                 else:
                     has_answer = False
                 
-                chunk_id = f"{filename}::{col}::{idx}"    
+                chunk_idx = 0
+                start_char = 0
+                end_char = len(text)
+                chunk_id = f"{filename}::{col}::{idx}::{chunk_idx}::{start_char}:{end_char}"  
                 self.records.append({
                     'file_name': filename,
-                    'document_name': document_name,
                     'chunk_id': chunk_id,
                     'clause_type': col,
                     'clause_text': text,
+                    'parent_clause_text': text,
+                    'contract_idx': idx,
+                    'chunk_idx': chunk_idx,
+                    'start_char': start_char,
+                    'end_char': end_char,
                     'has_answer': has_answer,
-                    'start_char': None,
-                    'end_char': None,
                     'source': 'master_clauses',
                 })
 
@@ -77,7 +85,6 @@ class RawToGoldAnswersProcessor:
     def process(self) -> pd.DataFrame:
         for idx, row in tqdm(self.df_gold_answers.iterrows(), total=len(self.df_gold_answers)):
             filename = row['Filename']
-            document_name = row['Document Name']
  
             for col_ans in self.answer_columns:
                 ans_val = row[col_ans]
@@ -88,7 +95,8 @@ class RawToGoldAnswersProcessor:
 
                 mask = (
                     (self.chunk_df['file_name'] == filename) &
-                    (self.chunk_df['clause_type'] == clause_type) 
+                    (self.chunk_df['clause_type'] == clause_type) &
+                    (self.chunk_df['contract_idx'] == idx)
                 )
                 matched_chunk_ids = self.chunk_df.loc[mask, 'chunk_id'].tolist()
 
@@ -96,17 +104,18 @@ class RawToGoldAnswersProcessor:
                     logger.warning(f"No chunk found for {filename}::{clause_type}::{idx}")
                     continue
 
+                matched_chunk_ids.sort(key=lambda x: int(x.split('::')[3]) if len(x.split('::')) >= 4 else 0)
                 sample_id = f"{filename}::{clause_type}::{idx}"
-                query = f"What is the {clause_type} in this agreement?"
+                query = build_query(clause_type)
 
                 self.records.append({
                     'sample_id': sample_id,
                     'file_name': filename,
-                    'document_name': document_name,
+                    'gold_chunk_ids': matched_chunk_ids,
                     'clause_type': clause_type,
                     'query' : query,
                     'gold_answer_text': gold_answer_text,
-                    'gold_chunk_ids': matched_chunk_ids,
+                    'contract_idx': idx,
                     'source': 'master_clauses',
                 })
         df_gold = pd.DataFrame(self.records)
