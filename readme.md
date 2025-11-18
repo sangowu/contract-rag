@@ -1,4 +1,4 @@
-# Contract Intelligence Analysis System
+# Contract Intelligence Analysis System (First draft - Under development..)
 
 AI-powered contract analysis platform based on Retrieval-Augmented Generation (RAG), using SentenceTransformer + ChromaDB + Qwen3-8B tech stack.
 
