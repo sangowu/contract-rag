@@ -64,17 +64,26 @@ python scripts/evaluate_script.py
 
 ## Evaluation Results
 
-Performance on CUAD dataset:
+Performance on CUAD dataset (End-to-End Evaluation):
 
-| Metric | @5 | @10 |
-|--------|----|-----|
-| Hit Rate | 0.78 | 0.85 |
-| Recall | 0.65 | 0.72 |
-| MRR | 0.68 | 0.71 |
+### Overall E2E Metrics
+- **Hit@k**: 0.3088
+- **MRR@k**: 0.1680  
+- **Recall@k**: 0.3088
+- **F1 Score (mean)**: 0.6377
+- **Exact Match (mean)**: 0.1832
+- **Accuracy (mean)**: 0.8738
 
-- **F1 Score**: 0.73
-- **Accuracy**: 0.76
-- **Exact Match**: 0.68
+### Performance by Answer Type
+
+| Answer Type | Samples | Hit@k | MRR@k | Recall@k | F1 | Exact Match | Accuracy |
+|-------------|---------|-------|-------|----------|----|-------------|----------|
+| BOOL | 16,320 | 0.2273 | 0.1131 | 0.2273 | 0.0000 | 0.0000 | 0.8738 |
+| DATE | 1,153 | 0.6756 | 0.3973 | 0.6756 | 0.0000 | 0.0009 | 0.0000 |
+| DURATION | 673 | 0.3566 | 0.2407 | 0.3566 | 0.0000 | 0.0416 | 0.0000 |
+| LIST_ENTITY | 509 | 0.7917 | 0.2554 | 0.7917 | 0.7483 | 0.0000 | 0.0000 |
+| LOCATION | 434 | 0.9954 | 0.9116 | 0.9954 | 0.0000 | 0.8871 | 0.0000 |
+| TEXT | 510 | 0.9588 | 0.5892 | 0.9588 | 0.5274 | 0.0000 | 0.0000 |
 
 ## Configuration
 
