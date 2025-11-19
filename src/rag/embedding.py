@@ -7,6 +7,7 @@ import re
 import unicodedata
 import os
 import ast
+from rank_bm25 import BM25Okapi, BM25L
 
 CHUNK_PATH = "/root/autodl-tmp/data/processed/CUAD_v1/cuad_v1_chunks.csv"
 GOLD_ANSWERS_PATH = "/root/autodl-tmp/data/answers/CUAD_v1/cuad_v1_gold_answers.csv"
@@ -38,9 +39,19 @@ def normalize_text(s: str) -> str:
     s = re.sub(r"\s+", " ", s.strip())
     return s.lower()
 
+def search_bm25(dataframe: pd.DataFrame, n=10, query: str = None):
+    bm25_tokenizer = BM25L.load(path="/root/autodl-tmp/data/index")
+    query_tokenizer = bm25_tokenizer.tokenizer(query)
+    bm25 = BM25L(bm25_tokenizer)
+    score = bm25.get_scores(query_tokenizer)
+    return score
+
+
 def initialize_embeddings():
     df_chunk = pd.read_csv(CHUNK_PATH)
-
+    bm25_tokenizer = BM25L(df_chunk)
+    bm25_tokenizer.index()
+    bm25_tokenizer.save(path="/root/autodl-tmp/data/index")
     model = SentenceTransformer(EMBEDDING_MODEL)
     chunk_ids = df_chunk['chunk_id'].astype(str).tolist()
     file_names = df_chunk['file_name'].astype(str).tolist()
@@ -90,6 +101,7 @@ def initialize_embeddings():
         logger.info(f"Upserted items {i}..{j-1}")
 
     logger.success(f"Upserted {total_items} embeddings to ChromaDB")
+
 
 def retrieve_top_k(
     query: str,
