@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     e2e_results.to_csv(E2E_RESULTS_PATH, index=False)
     logger.success(f"Saved e2e evaluation results to {E2E_RESULTS_PATH}")
-    test_results_path = "/root/autodl-tmp/results/csv/cuad_v1_e2e_test_20_samples.csv"
-    Path(test_results_path).parent.mkdir(parents=True, exist_ok=True)
-    e2e_results.to_csv(test_results_path, index=False)
-    logger.success(f"Saved sample e2e evaluation results to {test_results_path}")
+    # test_results_path = "/root/autodl-tmp/results/csv/cuad_v1_e2e_test_20_samples.csv"
+    # Path(test_results_path).parent.mkdir(parents=True, exist_ok=True)
+    # e2e_results.to_csv(test_results_path, index=False)
+    # logger.success(f"Saved sample e2e evaluation results to {test_results_path}")

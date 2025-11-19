@@ -2,17 +2,17 @@ import pandas as pd
 from typing import List, Dict
 from loguru import logger
 from sentence_transformers import SentenceTransformer
-import chromadb
-import re
-import unicodedata
-import os
-import ast
-from rank_bm25 import BM25Okapi, BM25L
+import re, os, sys, ast, unicodedata, chromadb
+from pathlib import Path
+from rank_bm25 import BM25L
+from loguru import logger
+from .retrieval import retrieve_top_k
 
 CHUNK_PATH = "/root/autodl-tmp/data/processed/CUAD_v1/cuad_v1_chunks.csv"
 GOLD_ANSWERS_PATH = "/root/autodl-tmp/data/answers/CUAD_v1/cuad_v1_gold_answers.csv"
 EMBEDDING_MODEL = "/root/autodl-tmp/model/sentence-transformers/all-MiniLM-L6-v2"
 CHROMA_DB_PATH = "/root/autodl-tmp/data/embeddings/chroma_db"
+BM25_INDEX_PATH = "/root/autodl-tmp/data/indexes/bm25"
 os.makedirs(CHROMA_DB_PATH, exist_ok=True)
 chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
     
@@ -39,19 +39,21 @@ def normalize_text(s: str) -> str:
     s = re.sub(r"\s+", " ", s.strip())
     return s.lower()
 
-def search_bm25(dataframe: pd.DataFrame, n=10, query: str = None):
-    bm25_tokenizer = BM25L.load(path="/root/autodl-tmp/data/index")
-    query_tokenizer = bm25_tokenizer.tokenizer(query)
-    bm25 = BM25L(bm25_tokenizer)
-    score = bm25.get_scores(query_tokenizer)
-    return score
+def build_bm25_index(chunk_texts: List[str]):
+    tokenized_corpus = []
+    for text in chunk_texts:
+        normalized = normalize_text(text)
+        tokens = re.findall(r'\b\w+\b', normalized)
+        tokenized_corpus.append(tokens)
 
+    bm25 = BM25L(tokenized_corpus) 
+    Path(BM25_INDEX_PATH).mkdir(parents=True, exist_ok=True)
+    bm25.save(path=BM25_INDEX_PATH)
+    logger.success(f"Built BM25 index with {len(tokenized_corpus)} documents")
+    return bm25, tokenized_corpus
 
 def initialize_embeddings():
     df_chunk = pd.read_csv(CHUNK_PATH)
-    bm25_tokenizer = BM25L(df_chunk)
-    bm25_tokenizer.index()
-    bm25_tokenizer.save(path="/root/autodl-tmp/data/index")
     model = SentenceTransformer(EMBEDDING_MODEL)
     chunk_ids = df_chunk['chunk_id'].astype(str).tolist()
     file_names = df_chunk['file_name'].astype(str).tolist()
@@ -68,6 +70,8 @@ def initialize_embeddings():
         except:
             natural_text = str(text)
         chunk_texts.append(normalize_text(natural_text))
+
+    build_bm25_index(chunk_texts)
 
     embeddings = model.encode(
         chunk_texts,
@@ -101,46 +105,6 @@ def initialize_embeddings():
         logger.info(f"Upserted items {i}..{j-1}")
 
     logger.success(f"Upserted {total_items} embeddings to ChromaDB")
-
-
-def retrieve_top_k(
-    query: str,
-    k: int = 10,
-    file_name: str | None = None,
-    top_k_retrieval: int = 100,
-) -> List[Dict[str, str]]:
-    try:
-        model = get_model()
-        collection = get_collection()
-        q_emb = model.encode([query], normalize_embeddings=True)[0]
-
-        where = {"file_name": file_name} if file_name else None
-        
-        results = collection.query(
-            query_embeddings=[q_emb.tolist()],
-            n_results=max(k, top_k_retrieval),
-            include=['metadatas'],
-            where=where,
-        )
-        
-        ids   = results["ids"][0]
-        metas = results["metadatas"][0]
-
-        ids   = ids[:k]
-        metas = metas[:k]
-
-        return [
-            {
-                "chunk_id": cid,
-                "clause_text": m.get("clause_text", ""),
-                "file_name": m.get("file_name", ""),
-                "clause_type": m.get("clause_type", ""),
-            }
-            for cid, m in zip(ids, metas)
-        ]
-    except Exception as e:
-        logger.error(f"Error during retrieval: {e}")
-        return []
 
 if __name__ == "__main__":
     initialize_embeddings()
