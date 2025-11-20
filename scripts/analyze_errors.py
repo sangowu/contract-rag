@@ -6,8 +6,10 @@ import pandas as pd
 from loguru import logger
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_vanilla.csv"
-OUTPUT_MD = "/root/autodl-tmp/results/md/vanilla_e2e/vanilla_error_cases.md"
+VANILLA_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_vanilla.csv"
+HYBRID_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_hybrid.csv"
+VANILLA_OUTPUT_MD = "/root/autodl-tmp/results/md/vanilla_e2e/vanilla_error_cases.md"
+HYBRID_OUTPUT_MD = "/root/autodl-tmp/results/md/hybrid_e2e/hybrid_error_cases.md"
 NUM_CATEGORIES = 5
 EXAMPLES_PER_CATEGORY = 5
 
@@ -36,7 +38,7 @@ def generate_error_md(
     worst = grouped.sort_values("hit_k").head(num_categories)
 
     lines = []
-    lines.append("# Vanilla RAG Error Cases\n")
+    lines.append("# Hybrid RAG Error Cases\n")
     lines.append("Auto-generated examples from CUAD v1 E2E evaluation.\n")
 
     for cat, row in worst.iterrows():
@@ -99,13 +101,13 @@ def main():
     parser.add_argument(
         "--csv",
         type=str,
-        default=INPUT_CSV,
-        help="Path to cuad_v1_e2e_vanilla.csv",
+        default=HYBRID_INPUT_CSV,
+        help="Path to cuad_v1_e2e_hybrid.csv",
     )
     parser.add_argument(
         "--out_md",
         type=str,
-        default=OUTPUT_MD,
+        default=HYBRID_OUTPUT_MD,
         help="Where to save the markdown error report.",
     )
     parser.add_argument(

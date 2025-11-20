@@ -4,10 +4,9 @@ from pathlib import Path
 from typing import List, Dict
 from loguru import logger
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from src.utils.evaluate_retrieval import evaluate_retrieval, evaluate_e2e, gold_chunk_coverage
-from src.rag.embedding import retrieve_top_k
+from src.utils.evaluate_retrieval import evaluate_e2e, gold_chunk_coverage
+from src.rag.retrieval import retrieve_top_k_hybrid
 from src.inference.llm_inference import llm_generate
-
 
 
 CHUNK_PATH = "/root/autodl-tmp/data/processed/CUAD_v1/cuad_v1_chunks.csv"
@@ -56,13 +55,14 @@ if __name__ == "__main__":
 
     e2e_results = evaluate_e2e(
         gold_df=df_gold_answers,
-        retrieve_fn=retrieve_top_k,
+        retrieve_fn=retrieve_top_k_hybrid,
         answer_fn=answer_fn,
         k=10,
         top_k_retrieved=50,
+        plot_loc="hybrid_e2e",
     )
     logger.info(f"E2E Results: {e2e_results}")
-
+    E2E_RESULTS_PATH = "/root/autodl-tmp/results/csv/cuad_v1_e2e_hybrid.csv"
     e2e_results.to_csv(E2E_RESULTS_PATH, index=False)
     logger.success(f"Saved e2e evaluation results to {E2E_RESULTS_PATH}")
     # test_results_path = "/root/autodl-tmp/results/csv/cuad_v1_e2e_test_20_samples.csv"

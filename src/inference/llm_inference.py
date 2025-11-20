@@ -1,6 +1,5 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from loguru import logger
-from src.rag.embedding import retrieve_top_k
 
 MODEL_NAME = "/root/autodl-tmp/model/Qwen3-8B"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
