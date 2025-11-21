@@ -98,10 +98,10 @@ def retrieve_top_k_hybrid(
     k: int = 10,
     file_name: str | None = None,
     top_k_retrieval: int = 100,
-    rrf_k: int = 60, 
+    rrf_k: int = 20, 
 ) -> List[Dict[str, str]]:
     try:
-        bm25_results = bm25_search(query, k=k, file_name=file_name)
+        bm25_results = bm25_search(query, k=top_k_retrieval, file_name=file_name)
         bm25_ranks = {result['chunk_id']: rank+1 for rank, result in enumerate(bm25_results)}
         retrieval_results = retrieve_top_k(query, k=k, file_name=file_name, top_k_retrieval=top_k_retrieval)
         retrieval_ranks = {result['chunk_id']: rank+1 for rank, result in enumerate(retrieval_results)}
@@ -111,9 +111,9 @@ def retrieve_top_k_hybrid(
         for chunk_id in all_chunk_ids:
             score = 0.0
             if chunk_id in bm25_ranks:
-                score += 1.0 / (rrf_k + bm25_ranks[chunk_id])
+                score += 0.3 / (rrf_k + bm25_ranks[chunk_id])
             if chunk_id in retrieval_ranks:
-                score += 1.0 / (rrf_k + retrieval_ranks[chunk_id])
+                score += 0.7 / (rrf_k + retrieval_ranks[chunk_id])
             rrf_scores[chunk_id] = score
         
         sorted_chunks = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:k]

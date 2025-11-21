@@ -37,7 +37,7 @@ def plot_rrs(rrs: pd.DataFrame,  loc: str, top_n: int = 10):
     labels = [f'{idx:.2f}' if isinstance(idx, float) else idx for idx in counts.index]
     values = counts.values
     colors = plt.cm.viridis(np.linspace(0, 1, len(values)))
-    bars = plt.bar(labels, values, color=colors, edgecolor='black', linewidth=0.5)
+    bars = plt.bar(range(len(labels)), values, color=colors, edgecolor='black', linewidth=0.5)
     plt.xlabel('RRs Values', fontsize=12)
     plt.ylabel('Count', fontsize=12)
     plt.title(f'RRs Distribution - {loc}', fontsize=14, fontweight='bold')
@@ -61,7 +61,7 @@ def plot_recalls(recalls: pd.DataFrame,  loc: str, top_n: int = 10):
     labels = [f'{idx:.2f}' if isinstance(idx, float) else idx for idx in counts.index]
     values = counts.values
     colors = plt.cm.viridis(np.linspace(0, 1, len(values)))
-    bars = plt.bar(labels, values, color=colors, edgecolor='black', linewidth=0.5)
+    bars = plt.bar(range(len(labels)), values, color=colors, edgecolor='black', linewidth=0.5)
     plt.xlabel('Recalls Values', fontsize=12)
     plt.ylabel('Count', fontsize=12)
     plt.title(f'Recalls Distribution - {loc}', fontsize=14, fontweight='bold')

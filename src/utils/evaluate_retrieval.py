@@ -1,6 +1,8 @@
 from typing import List, Callable, Tuple, Dict
 from tqdm import tqdm
-import ast
+import ast  
+import torch
+import gc
 import pandas as pd
 from loguru import logger
 
@@ -8,6 +10,42 @@ from src.utils.plot import plot_hits, plot_rrs, plot_recalls
 from src.utils.query_builder import build_query
 from src.utils.eval_answers import eval_one
 from config.cuad_meta import get_answer_type
+
+def clear_gpu_memory():
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    gc.collect()
+    logger.info("GPU memory cleared")
+
+def release_all_models():
+    try:
+        import src.rag.embedding as embedding_module
+        if hasattr(embedding_module, '_model') and embedding_module._model is not None:
+            del embedding_module._model
+            embedding_module._model = None
+            logger.info("Embedding model released")
+        
+        if hasattr(embedding_module, '_collection'):
+            embedding_module._collection = None
+        
+        import src.inference.llm_inference as llm_module
+        if hasattr(llm_module, 'transformers_model') and llm_module.transformers_model is not None:
+            del llm_module.transformers_model
+            llm_module.transformers_model = None
+            logger.info("Transformers model released")
+        
+        if hasattr(llm_module, 'tokenizer'):
+            llm_module.tokenizer = None
+        
+        for _ in range(3):
+            clear_gpu_memory()
+        
+        logger.success("All models released and GPU memory cleared")
+        
+    except Exception as e:
+        logger.warning(f"Failed to release some models: {e}")
+        clear_gpu_memory()
 
 
 def hit_at_k(retrieved: List[str], gold: List[str], k: int = 10) -> int:
@@ -221,3 +259,115 @@ def evaluate_e2e(
     result_df = pd.DataFrame(records)
     return result_df
 
+
+def evaluate_e2e_batch(
+    gold_df: pd.DataFrame,
+    retrieve_fn: Callable[[str, int], List[Dict[str, str]]],
+    answer_fn_batch: Callable[[List[str], List[List[Dict[str, str]]]], List[str]],
+    k: int = 10,
+    top_k_retrieved: int = 50,
+    batch_size: int = 4,
+    plot: bool = True,
+    plot_loc: str = "vanilla_e2e",
+) -> pd.DataFrame:
+
+    if len(gold_df) > 0 and isinstance(gold_df['gold_chunk_ids'].iloc[0], str):
+        gold_df = gold_df.copy()
+        gold_df['gold_chunk_ids'] = gold_df['gold_chunk_ids'].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+        )
+    
+    hits = []
+    rrs = []
+    recalls = []
+    records = []
+    
+    queries = []
+    retrieved_data_list = []
+    metadata_list = []
+    
+    logger.info(f"Preprocessing all queries and performing retrieval with batch size={batch_size}...")
+    
+    for _, row in tqdm(gold_df.iterrows(), total=len(gold_df), desc="retrieving"):
+        category = row["clause_type"]
+        gold_answer = row["gold_answer_text"]
+        gold_chunk_ids = row["gold_chunk_ids"]
+        file_name = row["file_name"]
+        
+        if "query" in row and isinstance(row["query"], str):
+            query = row["query"]
+        else:
+            query = build_query(category)
+
+        retrieved_data: List[Dict[str, str]] = retrieve_fn(query, k=top_k_retrieved, file_name=file_name)
+        retrieved_ids = [data['chunk_id'] for data in retrieved_data]
+
+        hit = hit_at_k(retrieved_ids, gold_chunk_ids, k)
+        rr = mrr_at_k(retrieved_ids, gold_chunk_ids, k)
+        rec = recall_at_k(retrieved_ids, gold_chunk_ids, k)
+
+        hits.append(hit)
+        rrs.append(rr)
+        recalls.append(rec)
+        
+        queries.append(query)
+        retrieved_data_list.append(retrieved_data)
+        metadata_list.append({
+            'category': category,
+            'gold_answer': gold_answer,
+            'gold_chunk_ids': gold_chunk_ids,
+            'hit': hit,
+            'rr': rr,
+            'rec': rec,
+        })
+    logger.success(f"Retrieval completed for {len(queries)} queries with batch size={batch_size}")
+    logger.info("Clearing GPU memory before inference...")
+    release_all_models()
+    logger.info(f"Starting batch inference for {len(queries)} queries with batch_size={batch_size}...")
+    model_answers = []
+    
+    for i in range(0, len(queries), batch_size):
+        batch_end = min(i + batch_size, len(queries))
+        batch_queries = queries[i:batch_end]
+        batch_retrieved = retrieved_data_list[i:batch_end]
+        
+        logger.info(f"Processing batch {i//batch_size + 1}/{(len(queries) + batch_size - 1)//batch_size} "
+                   f"({len(batch_queries)} queries)")
+        
+        batch_answers = answer_fn_batch(batch_queries, batch_retrieved)
+        model_answers.extend(batch_answers)
+    
+    logger.success(f"Batch inference completed for {len(model_answers)} queries")
+    
+    logger.info("Assembling evaluation results...")
+    
+    for j, (query, retrieved_data, metadata, model_answer) in enumerate(
+        zip(queries, retrieved_data_list, metadata_list, model_answers)
+    ):
+        ans_metrics = eval_one(metadata['category'], metadata['gold_answer'], model_answer)
+        
+        records.append({
+            "category": metadata['category'],
+            "answer_type": get_answer_type(metadata['category']),
+            "query": query,
+            "gold_answer": metadata['gold_answer'],
+            "model_answer": model_answer,
+            "hit@k": metadata['hit'],
+            "rr@k": metadata['rr'],
+            "recall@k": metadata['rec'],
+            **ans_metrics,
+        })
+    
+    if plot:
+        log_hits = pd.DataFrame(hits, columns=['hits'])
+        log_rrs = pd.DataFrame(rrs, columns=['rrs'])
+        log_recalls = pd.DataFrame(recalls, columns=['recalls'])
+        plot_hits(log_hits, plot_loc)
+        plot_rrs(log_rrs, plot_loc)
+        plot_recalls(log_recalls, plot_loc)
+    else:
+        logger.info("No plots generated")
+    
+    result_df = pd.DataFrame(records)
+    logger.success(f"Evaluation completed. Generated {len(result_df)} records.")
+    return result_df

@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import List, Dict
 from loguru import logger
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from src.utils.evaluate_retrieval import evaluate_e2e, gold_chunk_coverage
+from src.utils.evaluate_retrieval import evaluate_e2e, gold_chunk_coverage, evaluate_e2e_batch
 from src.rag.retrieval import retrieve_top_k_hybrid
-from src.inference.llm_inference import llm_generate
+from src.inference.llm_inference import llm_generate, llm_generate_batch_vllm, get_tokenizer, get_transformers_model
 
 
 CHUNK_PATH = "/root/autodl-tmp/data/processed/CUAD_v1/cuad_v1_chunks.csv"
@@ -15,9 +15,7 @@ E2E_RESULTS_PATH = "/root/autodl-tmp/results/csv/cuad_v1_e2e_vanilla.csv"
 
 
 def answer_fn(query: str, retrieved_data: List[Dict[str, str]]) -> str:
-    """
-    Answer the question based on the retrieved chunks.
-    """
+
     ctx_chunks = [data['clause_text'] for data in retrieved_data]
     context = "\n\n".join(ctx_chunks)
 
@@ -27,6 +25,21 @@ def answer_fn(query: str, retrieved_data: List[Dict[str, str]]) -> str:
     Answer as concisely as possible.
     """
     return llm_generate(prompt)
+
+def answer_fn_batch(queries: List[str], retrieved_data_list: List[List[Dict[str, str]]]) -> List[str]:
+
+    prompts = []
+    for query, retrieved_data in zip(queries, retrieved_data_list):
+        ctx_chunks = [data['clause_text'] for data in retrieved_data]
+        context = "\n\n".join(ctx_chunks)
+        prompt = f"""
+        Question: {query}
+        Relevant contract clauses: {context}
+        Answer as concisely as possible.
+        """
+        prompts.append(prompt)
+    
+    return llm_generate_batch_vllm(prompts)
 
 if __name__ == "__main__":
     df_gold_answers = pd.read_csv(GOLD_ANSWERS_PATH)
@@ -57,8 +70,8 @@ if __name__ == "__main__":
         gold_df=df_gold_answers,
         retrieve_fn=retrieve_top_k_hybrid,
         answer_fn=answer_fn,
-        k=10,
-        top_k_retrieved=50,
+        k=20,
+        top_k_retrieved=100,
         plot_loc="hybrid_e2e",
     )
     logger.info(f"E2E Results: {e2e_results}")
@@ -69,3 +82,6 @@ if __name__ == "__main__":
     # Path(test_results_path).parent.mkdir(parents=True, exist_ok=True)
     # e2e_results.to_csv(test_results_path, index=False)
     # logger.success(f"Saved sample e2e evaluation results to {test_results_path}")
+
+
+    os.system("/usr/bin/shutdown")
