@@ -31,9 +31,11 @@ def plot_hits(hits: pd.DataFrame, loc: str):
     plt.close()
     logger.info(f"Saved hits plot to {img_path}")
 
-def plot_rrs(rrs: pd.DataFrame,  loc: str, top_n: int = 10):
+def plot_rrs(rrs: pd.DataFrame,  loc: str, max_categories : Optional[int] = None):
     plt.figure(figsize=(8, 5))
     counts = rrs['rrs'].value_counts().sort_index(ascending=False)
+    if max_categories is not None and max_categories > 0:
+        counts = counts.head(max_categories)
     labels = [f'{idx:.2f}' if isinstance(idx, float) else idx for idx in counts.index]
     values = counts.values
     colors = plt.cm.viridis(np.linspace(0, 1, len(values)))
@@ -46,7 +48,7 @@ def plot_rrs(rrs: pd.DataFrame,  loc: str, top_n: int = 10):
     plt.ylim(0, max_val * 1.2)
     for bar in bars:
         height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2, height + max(values) * 0.01, f'{float(height):.2f}', ha='center', va='bottom')
+        plt.text(bar.get_x() + bar.get_width()/2, height + max_val * 0.01, f'{float(height):.2f}', ha='center', va='bottom')
         
     plt.tight_layout()
     img_path = Path(save_path) / loc / f"{loc}_rrs.png"
@@ -55,9 +57,11 @@ def plot_rrs(rrs: pd.DataFrame,  loc: str, top_n: int = 10):
     plt.close()
     logger.info(f"Saved rrs plot to {img_path}")    
 
-def plot_recalls(recalls: pd.DataFrame,  loc: str, top_n: int = 10):
+def plot_recalls(recalls: pd.DataFrame,  loc: str, max_categories: Optional[int] = None):
     plt.figure(figsize=(8, 5))
     counts = recalls['recalls'].value_counts().sort_index(ascending=False)
+    if max_categories is not None and max_categories > 0:
+        counts = counts.head(max_categories)
     labels = [f'{idx:.2f}' if isinstance(idx, float) else idx for idx in counts.index]
     values = counts.values
     colors = plt.cm.viridis(np.linspace(0, 1, len(values)))
@@ -70,7 +74,7 @@ def plot_recalls(recalls: pd.DataFrame,  loc: str, top_n: int = 10):
     plt.ylim(0, max_val * 1.2)
     for bar in bars:
         height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2, height + max(values) * 0.01, f'{float(height):.2f}', ha='center', va='bottom')
+        plt.text(bar.get_x() + bar.get_width()/2, height + max_val * 0.01, f'{float(height):.2f}', ha='center', va='bottom')
         
     plt.tight_layout()
     img_path = Path(save_path) / loc / f"{loc}_recalls.png"
@@ -82,7 +86,7 @@ def plot_recalls(recalls: pd.DataFrame,  loc: str, top_n: int = 10):
 def plot_category_hits(
     df: pd.DataFrame,
     loc: str,
-    top_n: Optional[int] = None,
+    max_categories: Optional[int] = None,
 ) -> None:
 
     grouped = (
@@ -91,8 +95,8 @@ def plot_category_hits(
         .sort_values("hit_k")
     )
 
-    if top_n is not None and top_n > 0:
-        grouped = grouped.head(top_n)
+    if max_categories is not None and max_categories > 0:
+        grouped = grouped.head(max_categories)
 
     plt.figure(figsize=(10, max(4, len(grouped) * 0.3)))
     plt.barh(grouped.index, grouped["hit_k"])
@@ -105,6 +109,11 @@ def plot_category_hits(
     plt.close()
     logger.success(f"Saved hit@k by category plot to {img_path}")
 
+def plot_all_metrics(df: pd.DataFrame, loc: str):
+    plot_category_hits(df, loc, max_categories=10)
+    plot_recalls(df, loc, max_categories=10)
+    plot_rrs(df, loc, max_categories=10)
+    plot_hits(df, loc)
 
 if __name__ == "__main__":
     hits = pd.DataFrame([0, 1, 1, 1, 0, 0, 0, 0, 0, 0], columns=['hits'])

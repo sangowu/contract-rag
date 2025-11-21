@@ -111,15 +111,3 @@ def initialize_embeddings():
 
 if __name__ == "__main__":
     initialize_embeddings()
-    # df_gold_answers = pd.read_csv(GOLD_ANSWERS_PATH)
-    # row = df_gold_answers.iloc[0]
-    # gold_answer = row['gold_answer_text']
-    # gold_chunk_ids = ast.literal_eval(row['gold_chunk_ids']) if isinstance(row['gold_chunk_ids'], str) else row['gold_chunk_ids']
-    # query = row['query']
-    # file_name = row['file_name']
-    # topk_chunks = retrieve_top_k(query, k=10, file_name=file_name)
-
-    # logger.info(f"Top chunk id: {topk_chunks[0]['chunk_id']}")
-    # logger.info(f"Gold chunk id: {gold_chunk_ids}")
-    # logger.info(f"Gold answer: {gold_answer}")
-    # logger.info(f"Query: {query}")
