@@ -79,7 +79,7 @@ def main():
     plot_category_hits(
         df,
         loc=HYBRID_PLOT_LOC,
-        top_n=args.top_n_categories if args.top_n_categories > 0 else None,
+        max_categories=args.top_n_categories if args.top_n_categories > 0 else None,
     )
 
 

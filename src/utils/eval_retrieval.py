@@ -137,7 +137,7 @@ def gold_chunk_coverage(
 def evaluate_retrieval(
     gold_df: pd.DataFrame,
     retrieve_fn: Callable[[str, int], List[Dict[str, str]]],
-    k: int = 10,
+    top_k_shown: int = 10,
     top_k_retrieved: int = 50,
     plot: bool = True,
     plot_loc: str = "vanilla_retrieval",
@@ -158,9 +158,9 @@ def evaluate_retrieval(
         gold_chunk_ids = [str(cid) for cid in gold_chunk_ids]
         retrieved_data: List[Dict[str, str]] = retrieve_fn(query, k=top_k_retrieved, file_name=file_name)
         retrieved_ids = [str(data['chunk_id']) for data in retrieved_data]
-        hits.append(hit_at_k(retrieved_ids, gold_chunk_ids, k))
-        rrs.append(mrr_at_k(retrieved_ids, gold_chunk_ids, k))
-        recalls.append(recall_at_k(retrieved_ids, gold_chunk_ids, k))
+        hits.append(hit_at_k(retrieved_ids, gold_chunk_ids, top_k_shown))
+        rrs.append(mrr_at_k(retrieved_ids, gold_chunk_ids, top_k_shown))
+        recalls.append(recall_at_k(retrieved_ids, gold_chunk_ids, top_k_shown))
 
     logger.info(f"Hits: {hits[:10]}")
     logger.info(f"RRs: {rrs[:10]}")
@@ -179,7 +179,7 @@ def evaluate_retrieval(
     recall_at_k_value = sum(recalls) / len(recalls) if recalls else 0.0
     mrr_at_k_value = sum(rrs) / len(rrs) if rrs else 0.0
 
-    logger.success(f"Recall@{k}: {recall_at_k_value:.4f}, MRR@{k}: {mrr_at_k_value:.4f}, Hit Rate@{k}: {hit_rate_at_k:.4f}")
+    logger.success(f"Recall@{top_k_shown}: {recall_at_k_value:.4f}, MRR@{top_k_shown}: {mrr_at_k_value:.4f}, Hit Rate@{top_k_shown}: {hit_rate_at_k:.4f}")
 
     return hit_rate_at_k, recall_at_k_value, mrr_at_k_value
 
@@ -213,7 +213,7 @@ def evaluate_e2e(
         else:
             query = build_query(category)
 
-        retrieved_data: List[Dict[str, str]] = retrieve_fn(query, k=top_k_retrieved, file_name=file_name)
+        retrieved_data: List[Dict[str, str]] = retrieve_fn(query, top_k_shown=top_k_shown, top_k_retrieval=top_k_retrieved, file_name=file_name)
         retrieved_ids = [data['chunk_id'] for data in retrieved_data]
 
         hit = hit_at_k(retrieved_ids, gold_chunk_ids, top_k_shown)

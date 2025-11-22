@@ -5,8 +5,8 @@ Auto-generated examples from CUAD v1 E2E evaluation.
 ## Category: Price Restrictions
 
 - #samples: 510
-- hit@k (mean): 0.0588
-- MRR@k (mean): 0.0122
+- hit@k (mean): 0.0667
+- MRR@k (mean): 0.0126
 
 ### Example 1
 
@@ -53,8 +53,8 @@ Auto-generated examples from CUAD v1 E2E evaluation.
 ## Category: Most Favored Nation
 
 - #samples: 510
-- hit@k (mean): 0.0824
-- MRR@k (mean): 0.0143
+- hit@k (mean): 0.0843
+- MRR@k (mean): 0.0170
 
 ### Example 1
 
@@ -101,16 +101,16 @@ Auto-generated examples from CUAD v1 E2E evaluation.
 ## Category: No-Solicit Of Customers
 
 - #samples: 510
-- hit@k (mean): 0.1078
-- MRR@k (mean): 0.0441
+- hit@k (mean): 0.0980
+- MRR@k (mean): 0.0436
 
 ### Example 1
 
 - **query**: Does this agreement include any 'No-Solicit Of Customers' clause? Answer strictly with 'Yes' or 'No'.
 - **gold_answer**: No
-- **model_answer**: Yes
+- **model_answer**: No.
 - **hit@k**: 0.0000, **rr@k**: 0.0000, **recall@k**: 0.0000
-- **extra**: acc=0.0000
+- **extra**: acc=1.0000
 
 ### Example 2
 
@@ -150,7 +150,7 @@ Auto-generated examples from CUAD v1 E2E evaluation.
 
 - #samples: 510
 - hit@k (mean): 0.1176
-- MRR@k (mean): 0.0306
+- MRR@k (mean): 0.0303
 
 ### Example 1
 
@@ -197,14 +197,14 @@ Auto-generated examples from CUAD v1 E2E evaluation.
 ## Category: No-Solicit Of Employees
 
 - #samples: 510
-- hit@k (mean): 0.1333
-- MRR@k (mean): 0.0863
+- hit@k (mean): 0.1314
+- MRR@k (mean): 0.0829
 
 ### Example 1
 
 - **query**: Does this agreement include any 'No-Solicit Of Employees' clause? Answer strictly with 'Yes' or 'No'.
 - **gold_answer**: No
-- **model_answer**: No.
+- **model_answer**: No
 - **hit@k**: 0.0000, **rr@k**: 0.0000, **recall@k**: 0.0000
 - **extra**: acc=1.0000
 

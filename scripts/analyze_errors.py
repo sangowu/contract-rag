@@ -38,7 +38,7 @@ def generate_error_md(
     worst = grouped.sort_values("hit_k").head(num_categories)
 
     lines = []
-    lines.append("# Hybrid RAG Error Cases\n")
+    lines.append("# Vanilla RAG Error Cases\n")
     lines.append("Auto-generated examples from CUAD v1 E2E evaluation.\n")
 
     for cat, row in worst.iterrows():
@@ -101,13 +101,13 @@ def main():
     parser.add_argument(
         "--csv",
         type=str,
-        default=HYBRID_INPUT_CSV,
-        help="Path to cuad_v1_e2e_hybrid.csv",
+        default=VANILLA_INPUT_CSV,
+        help="Path to cuad_v1_e2e_vanilla.csv",
     )
     parser.add_argument(
         "--out_md",
         type=str,
-        default=HYBRID_OUTPUT_MD,
+        default=VANILLA_OUTPUT_MD,
         help="Where to save the markdown error report.",
     )
     parser.add_argument(

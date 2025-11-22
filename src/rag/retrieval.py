@@ -21,7 +21,7 @@ def load_bm25_index():
     else:
         raise FileNotFoundError(f"BM25 index not found at {BM25_INDEX_PATH}")
 
-def bm25_search(query: str, top_k_shown: int = 10, file_name: str | None = None):
+def bm25_search(query: str, top_k_retrieval: int = 10, file_name: str | None = None):
     try:
         chunk_df = get_chunk_df()
         bm25 = load_bm25_index()
@@ -36,10 +36,10 @@ def bm25_search(query: str, top_k_shown: int = 10, file_name: str | None = None)
             file_indices = chunk_df[file_mask].index.tolist()
             
             file_scores = scores[file_indices]
-            file_sorted_indices = file_scores.argsort()[::-1][:top_k_shown]
+            file_sorted_indices = file_scores.argsort()[::-1][:top_k_retrieval]
             top_k_indices = [file_indices[i] for i in file_sorted_indices]
         else:
-            top_k_indices = all_indices[:top_k_shown]
+            top_k_indices = all_indices[:top_k_retrieval]
 
         return [
             {
@@ -56,7 +56,7 @@ def bm25_search(query: str, top_k_shown: int = 10, file_name: str | None = None)
 
 def retrieve_top_k(
     query: str,
-    top_k_shown: int = 10,
+    top_k_shown: int | None = None,
     file_name: str | None = None,
     top_k_retrieval: int = 100,
 ) -> List[Dict[str, str]]:
@@ -69,7 +69,7 @@ def retrieve_top_k(
         
         results = collection.query(
             query_embeddings=[q_emb.tolist()],
-            n_results=max(top_k_shown, top_k_retrieval),
+            n_results=top_k_retrieval,
             include=['metadatas'],
             where=where,
         )
@@ -77,8 +77,8 @@ def retrieve_top_k(
         ids = results["ids"][0]
         metas = results["metadatas"][0]
 
-        ids = ids[:top_k_shown]
-        metas = metas[:top_k_shown]
+        ids = ids[:top_k_shown if top_k_shown else top_k_retrieval]
+        metas = metas[:top_k_shown if top_k_shown else top_k_retrieval]
 
         return [
             {
@@ -101,9 +101,9 @@ def retrieve_top_k_hybrid(
     rrf_k: int = 20, 
 ) -> List[Dict[str, str]]:
     try:
-        bm25_results = bm25_search(query, top_k_shown=top_k_retrieval, file_name=file_name)
+        bm25_results = bm25_search(query, top_k_retrieval=top_k_retrieval, file_name=file_name)
         bm25_ranks = {result['chunk_id']: rank+1 for rank, result in enumerate(bm25_results)}
-        retrieval_results = retrieve_top_k(query, top_k_shown=top_k_shown, file_name=file_name, top_k_retrieval=top_k_retrieval)
+        retrieval_results = retrieve_top_k(query, file_name=file_name, top_k_retrieval=top_k_retrieval)
         retrieval_ranks = {result['chunk_id']: rank+1 for rank, result in enumerate(retrieval_results)}
 
         rrf_scores = {}
