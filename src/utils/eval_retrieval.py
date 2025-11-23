@@ -10,6 +10,7 @@ from src.utils.plot import plot_hits, plot_rrs, plot_recalls
 from src.utils.query_builder import build_query
 from src.utils.eval_answers import eval_one
 from config.cuad_meta import get_answer_type
+from src.rag.retrieval import rerank_results
 
 def clear_gpu_memory():
     if torch.cuda.is_available():
@@ -237,6 +238,81 @@ def evaluate_e2e(
             "hit@k": hit,
             "rr@k": rr,
             "recall@k": rec,
+            **ans_metrics,   
+        })
+
+    if plot:
+        log_hits = pd.DataFrame(hits, columns=['hits'])
+        log_rrs = pd.DataFrame(rrs, columns=['rrs'])
+        log_recalls = pd.DataFrame(recalls, columns=['recalls'])
+        plot_hits(log_hits, plot_loc)
+        plot_rrs(log_rrs, plot_loc)
+        plot_recalls(log_recalls, plot_loc)
+    else:
+        logger.info("No plots generated")
+
+    result_df = pd.DataFrame(records)
+    return result_df
+
+def evaluate_reranked_e2e(
+    gold_df: pd.DataFrame,
+    retrieve_fn: Callable[[str, int], List[Dict[str, str]]],
+    answer_fn: Callable[[str, List[Dict[str, str]]], str],
+    top_k_shown: int = 10,
+    top_k_retrieved: int = 50,
+    top_k_reranked: int | None = None,
+    plot: bool = True,
+    plot_loc: str = "reranked_e2e",
+) -> pd.DataFrame:
+
+    if len(gold_df) > 0 and isinstance(gold_df['gold_chunk_ids'].iloc[0], str):
+        gold_df = gold_df.copy()
+        gold_df['gold_chunk_ids'] = gold_df['gold_chunk_ids'].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+        )
+    hits = []
+    rrs = []
+    recalls = []
+    records = []
+
+    for _, row in tqdm(gold_df.iterrows(), total=len(gold_df), desc="evaluating reranked e2e"):
+        category = row["clause_type"]
+        gold_answer = row["gold_answer_text"]
+        gold_chunk_ids = row["gold_chunk_ids"]
+        file_name = row["file_name"]
+        if "query" in row and isinstance(row["query"], str):
+            query = row["query"]
+        else:
+            query = build_query(category)
+
+        retrieved_data: List[Dict[str, str]] = retrieve_fn(query, top_k_shown=top_k_shown, top_k_retrieval=top_k_retrieved, file_name=file_name)
+        # retrieved_ids = [data['chunk_id'] for data in retrieved_data]
+
+        reranked_data = rerank_results(query, retrieved_data, top_k=top_k_reranked)
+        reranked_ids = [data['chunk_id'] for data in reranked_data]
+
+        hit = hit_at_k(reranked_ids, gold_chunk_ids, top_k_shown)
+        rr = mrr_at_k(reranked_ids, gold_chunk_ids, top_k_shown)
+        rec = recall_at_k(reranked_ids, gold_chunk_ids, top_k_shown)
+
+        hits.append(hit)
+        rrs.append(rr)
+        recalls.append(rec)
+
+        model_answer = answer_fn(query, reranked_data)
+
+        ans_metrics = eval_one(category, gold_answer, model_answer)
+
+        records.append({
+            "category": category,
+            "answer_type": get_answer_type(category),
+            "query": query,
+            "gold_answer": gold_answer,
+            "model_answer": model_answer,
+            "hit@k": hit,
+            "rr@k": rr,
+            "recall@k": rec,
+            "reranked_score": reranked_data[0]['rerank_score'] if reranked_data else 0.0,
             **ans_metrics,   
         })
 

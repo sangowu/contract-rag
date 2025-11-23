@@ -74,7 +74,7 @@ def _llm_generate_batch_vllm(
         stop=["\n\n", "###", "<|endoftext|>"], 
     )
     
-    logger.info(f"Starting vLLM batch inference for {len(prompts)} prompts...")
+    # logger.info(f"Starting vLLM batch inference for {len(prompts)} prompts...")
     outputs = llm.generate(prompts, sampling_params)
     
     results = []
@@ -84,7 +84,7 @@ def _llm_generate_batch_vllm(
         if i < 3:  
             logger.debug(f"Generated {i+1}: {generated_text[:100]}...")
     
-    logger.success(f"vLLM batch inference completed for {len(prompts)} prompts")
+    # logger.success(f"vLLM batch inference completed for {len(prompts)} prompts")
     return results
 
 def _llm_generate_batch_transformers(
@@ -100,7 +100,7 @@ def _llm_generate_batch_transformers(
 
     results = []
     
-    logger.info(f"Starting transformers batch inference for {len(prompts)} prompts...")
+    # logger.info(f"Starting transformers batch inference for {len(prompts)} prompts...")
     
     for i in range(0, len(prompts), batch_size):
         batch_prompts = prompts[i:i+batch_size]
@@ -150,7 +150,7 @@ def _llm_generate_batch_transformers(
             if len(results) <= 3:  
                 logger.debug(f"Generated {len(results)}: {content[:100]}...")
     
-    logger.success(f"Transformers batch inference completed for {len(prompts)} prompts")
+    # logger.success(f"Transformers batch inference completed for {len(prompts)} prompts")
     return results
 
 def llm_generate(

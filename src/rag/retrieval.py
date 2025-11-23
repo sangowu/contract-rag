@@ -1,12 +1,17 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 from loguru import logger
 from pathlib import Path
+import torch
 import re, pandas as pd, pickle
 from .embedding import get_model, get_collection, normalize_text
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
 BM25_INDEX_PATH = "/root/autodl-tmp/data/indexes/bm25/bm25_index.pkl"
 CHUNK_PATH = "/root/autodl-tmp/data/processed/CUAD_v1/cuad_v1_chunks.csv"
+RERANKER_MODEL = "/root/autodl-tmp/model/Qwen3-Reranker-4B"
 _chunk_df = None
+_reranker_tokenizer = None
+_reranker_model = None
 
 def get_chunk_df():
     global _chunk_df
@@ -20,6 +25,47 @@ def load_bm25_index():
             return pickle.load(f)
     else:
         raise FileNotFoundError(f"BM25 index not found at {BM25_INDEX_PATH}")
+
+def load_reranker():
+    global _reranker_tokenizer, _reranker_model
+    if _reranker_model is None:
+        if not Path(RERANKER_MODEL).exists():
+            raise FileNotFoundError(f"Reranker model not found at {RERANKER_MODEL}")
+
+        logger.info(f"Loading Qwen3-Reranker from {RERANKER_MODEL}")
+
+        _reranker_tokenizer = AutoTokenizer.from_pretrained(
+            RERANKER_MODEL,
+            padding_side="left",
+            trust_remote_code=True,
+        )
+
+        global max_length
+        max_length = 1024
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        )
+
+        _reranker_model = AutoModelForCausalLM.from_pretrained(
+            RERANKER_MODEL,
+            dtype="auto", 
+            quantization_config=bnb_config,
+            device_map="auto" if torch.cuda.is_available() else None,
+        ).eval()
+
+        logger.success("Qwen3-Reranker loaded successfully")
+    return _reranker_tokenizer, _reranker_model
+
+def format_instruction(instruction: str | None, query: str, doc: str) -> str:
+    if instruction is None:
+        instruction = 'Given a web search query, retrieve relevant passages that answer the query'
+    output = "<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}".format(
+        instruction=instruction, query=query, doc=doc)
+    return output
 
 def bm25_search(query: str, top_k_retrieval: int = 10, file_name: str | None = None):
     try:
@@ -133,3 +179,66 @@ def retrieve_top_k_hybrid(
     except Exception as e:
         logger.error(f"Error during hybrid retrieval: {e}")
         return []
+
+def rerank_results(
+    query: str,
+    candidate_chunks: List[Dict[str, str]],
+    top_k: Optional[int] = None,
+    batch_size: int = 4,
+) -> List[Dict[str, str]]:
+    if not candidate_chunks:
+        return []
+    
+    tokenizer, model = load_reranker()
+
+    yes_ids = tokenizer.encode(" yes", add_special_tokens=False)
+    no_ids  = tokenizer.encode(" no", add_special_tokens=False)
+    if len(yes_ids) != 1 or len(no_ids) != 1:
+        yes_ids = tokenizer.encode("yes", add_special_tokens=False)
+        no_ids  = tokenizer.encode("no", add_special_tokens=False)
+    assert len(yes_ids) == 1 and len(no_ids) == 1
+    token_true_id, token_false_id = yes_ids[0], no_ids[0]
+    
+    task = 'Given a web search query, retrieve relevant passages that answer the query'
+    docs = [c.get("clause_text","") for c in candidate_chunks]
+    pairs = [format_instruction(task, query, d) for d in docs]
+    
+    scores = []
+    model.eval()
+    with torch.no_grad():
+        for i in range(0, len(pairs), batch_size):
+            batch_pairs = pairs[i:i + batch_size]
+            
+            inputs = tokenizer(
+                batch_pairs,
+                padding=True,
+                truncation=True,
+                max_length=max_length,
+                return_tensors='pt'
+            )
+            
+            inputs = {k: v.to(model.device) for k, v in inputs.items()}
+            
+            batch_scores = model(**inputs).logits[:, -1, :]
+            true_vector = batch_scores[:, token_true_id]
+            false_vector = batch_scores[:, token_false_id]
+            
+            batch_scores = torch.stack([false_vector, true_vector], dim=1)
+            batch_scores = torch.nn.functional.log_softmax(batch_scores, dim=1)
+            batch_relevance_scores = batch_scores[:, 1].exp().tolist()
+            
+            scores.extend(batch_relevance_scores)
+    
+    scored_candidates = [(score, cand) for score, cand in zip(scores, candidate_chunks)]
+    scored_candidates.sort(key=lambda x: x[0], reverse=True)
+    
+    if top_k:
+        results = [cand for _, cand in scored_candidates[:top_k]]
+    else:
+        results = [cand for _, cand in scored_candidates]
+    
+    for i, (score, _) in enumerate(scored_candidates[:top_k] if top_k else scored_candidates):
+        results[i]['rerank_score'] = score
+    
+    logger.info(f"Reranked {len(results)} candidates, top score: {max(scores) if scores else 0}")
+    return results

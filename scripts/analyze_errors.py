@@ -7,9 +7,11 @@ from loguru import logger
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 VANILLA_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_vanilla.csv"
-HYBRID_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_hybrid.csv"
 VANILLA_OUTPUT_MD = "/root/autodl-tmp/results/md/vanilla_e2e/vanilla_error_cases.md"
+HYBRID_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_hybrid.csv"
 HYBRID_OUTPUT_MD = "/root/autodl-tmp/results/md/hybrid_e2e/hybrid_error_cases.md"
+REANKER_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_reranked.csv"
+REANKER_OUTPUT_MD = "/root/autodl-tmp/results/md/reranked_e2e/reranked_error_cases.md"
 NUM_CATEGORIES = 5
 EXAMPLES_PER_CATEGORY = 5
 
@@ -101,13 +103,13 @@ def main():
     parser.add_argument(
         "--csv",
         type=str,
-        default=VANILLA_INPUT_CSV,
-        help="Path to cuad_v1_e2e_vanilla.csv",
+        default=REANKER_INPUT_CSV,
+        help="Path to cuad_v1_e2e_reranked.csv",
     )
     parser.add_argument(
         "--out_md",
         type=str,
-        default=VANILLA_OUTPUT_MD,
+        default=REANKER_OUTPUT_MD,
         help="Where to save the markdown error report.",
     )
     parser.add_argument(

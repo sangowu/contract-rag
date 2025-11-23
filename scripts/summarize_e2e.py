@@ -9,8 +9,10 @@ from src.utils.plot import plot_category_hits
 
 VANILLA_E2E_RESULTS_PATH = "/root/autodl-tmp/results/csv/cuad_v1_e2e_vanilla.csv"
 HYBRID_E2E_RESULTS_PATH = "/root/autodl-tmp/results/csv/cuad_v1_e2e_hybrid.csv"
+REANKED_E2E_RESULTS_PATH = "/root/autodl-tmp/results/csv/cuad_v1_e2e_reranked.csv"
 VANILLA_PLOT_LOC = "vanilla_e2e"
 HYBRID_PLOT_LOC = "hybrid_e2e"
+REANKED_PLOT_LOC = "reranked_e2e"
 TOP_N_CATEGORIES = 0
 
 def summarize_metrics(df: pd.DataFrame) -> None:
@@ -62,7 +64,7 @@ def main():
     parser.add_argument(
         "--csv",
         type=str,
-        default=HYBRID_E2E_RESULTS_PATH,
+        default=REANKED_E2E_RESULTS_PATH,
         help="Path to e2e results csv file",
     )
     parser.add_argument(
@@ -78,10 +80,9 @@ def main():
     summarize_metrics(df)
     plot_category_hits(
         df,
-        loc=HYBRID_PLOT_LOC,
+        loc=REANKED_PLOT_LOC,
         max_categories=args.top_n_categories if args.top_n_categories > 0 else None,
     )
-
 
 if __name__ == "__main__":
     main()
