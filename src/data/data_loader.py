@@ -31,7 +31,7 @@ class RawToChunkRecordsProcessor:
         self.df_chunks = df_raw.copy()
         self.answer_columns = [c for c in self.df_chunks.columns if c.endswith('-Answer')]
         self.df_chunks.drop(self.answer_columns, axis=1, inplace=True)
-        self.clause_text_cols = [c for c in self.df_chunks.columns if c not in ['Filename']]
+        self.clause_text_cols = [c for c in self.df_chunks.columns if c not in ['Filename', 'Unnamed: 0']]
         self.records = []
 
     def process(self) -> pd.DataFrame:
@@ -45,7 +45,7 @@ class RawToChunkRecordsProcessor:
                 ans_col = f"{col}-Answer"
                 if ans_col in self.df_raw.columns:
                     ans_val = self.df_raw.loc[idx, ans_col]
-                    has_answer = pd.notna(ans_val) and str(ans_val).strip() != ''
+                    has_answer = pd.notna(ans_val) and str(ans_val).strip() != '' and str(ans_val).lower() != "not present"
                 else:
                     has_answer = False
                 
@@ -88,7 +88,7 @@ class RawToGoldAnswersProcessor:
  
             for col_ans in self.answer_columns:
                 ans_val = row[col_ans]
-                if pd.isna(ans_val):
+                if pd.isna(ans_val) or str(ans_val).strip() == "" or str(ans_val).lower() == "not present":
                     continue
                 gold_answer_text = str(ans_val).strip()
                 clause_type = col_ans.replace('-Answer', '')

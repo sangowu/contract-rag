@@ -1,6 +1,6 @@
 import pandas as pd
 import pickle
-from typing import List, Dict
+from typing import List
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 import re, os, sys, ast, unicodedata, chromadb

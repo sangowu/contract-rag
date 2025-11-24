@@ -4,14 +4,13 @@ from pathlib import Path
 import torch
 import re, pandas as pd, pickle
 from .embedding import get_model, get_collection, normalize_text
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from src.utils.model_loading import load_reranker
 
 BM25_INDEX_PATH = "/root/autodl-tmp/data/indexes/bm25/bm25_index.pkl"
 CHUNK_PATH = "/root/autodl-tmp/data/processed/CUAD_v1/cuad_v1_chunks.csv"
 RERANKER_MODEL = "/root/autodl-tmp/model/Qwen3-Reranker-4B"
 _chunk_df = None
-_reranker_tokenizer = None
-_reranker_model = None
+RERANKER_MAX_LENGTH = 1024  
 
 def get_chunk_df():
     global _chunk_df
@@ -25,40 +24,6 @@ def load_bm25_index():
             return pickle.load(f)
     else:
         raise FileNotFoundError(f"BM25 index not found at {BM25_INDEX_PATH}")
-
-def load_reranker():
-    global _reranker_tokenizer, _reranker_model
-    if _reranker_model is None:
-        if not Path(RERANKER_MODEL).exists():
-            raise FileNotFoundError(f"Reranker model not found at {RERANKER_MODEL}")
-
-        logger.info(f"Loading Qwen3-Reranker from {RERANKER_MODEL}")
-
-        _reranker_tokenizer = AutoTokenizer.from_pretrained(
-            RERANKER_MODEL,
-            padding_side="left",
-            trust_remote_code=True,
-        )
-
-        global max_length
-        max_length = 1024
-
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-        )
-
-        _reranker_model = AutoModelForCausalLM.from_pretrained(
-            RERANKER_MODEL,
-            dtype="auto", 
-            quantization_config=bnb_config,
-            device_map="auto" if torch.cuda.is_available() else None,
-        ).eval()
-
-        logger.success("Qwen3-Reranker loaded successfully")
-    return _reranker_tokenizer, _reranker_model
 
 def format_instruction(instruction: str | None, query: str, doc: str) -> str:
     if instruction is None:
@@ -141,7 +106,7 @@ def retrieve_top_k(
 
 def retrieve_top_k_hybrid(
     query: str,
-    top_k_shown: int = 10,
+    top_k_shown: int = 20,
     file_name: str | None = None,
     top_k_retrieval: int = 100,
     rrf_k: int = 20, 
@@ -184,12 +149,12 @@ def rerank_results(
     query: str,
     candidate_chunks: List[Dict[str, str]],
     top_k: Optional[int] = None,
-    batch_size: int = 4,
+    batch_size: int = 16,
 ) -> List[Dict[str, str]]:
     if not candidate_chunks:
         return []
     
-    tokenizer, model = load_reranker()
+    tokenizer, model = load_reranker(RERANKER_MODEL) 
 
     yes_ids = tokenizer.encode(" yes", add_special_tokens=False)
     no_ids  = tokenizer.encode(" no", add_special_tokens=False)
@@ -213,7 +178,7 @@ def rerank_results(
                 batch_pairs,
                 padding=True,
                 truncation=True,
-                max_length=max_length,
+                max_length=RERANKER_MAX_LENGTH,
                 return_tensors='pt'
             )
             

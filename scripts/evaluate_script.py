@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Dict
 from loguru import logger
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from src.utils.eval_retrieval import evaluate_reranked_e2e, gold_chunk_coverage
+from src.utils.eval_retrieval import evaluate_reranked_e2e, gold_chunk_coverage, evaluate_reranked_e2e_optimized
 from src.rag.retrieval import retrieve_top_k_hybrid, retrieve_top_k
 from src.inference.llm_inference import llm_generate
 
@@ -39,13 +39,12 @@ if __name__ == "__main__":
     # logger.info(f"Top missing:\n{missing_tbl.head(5)}")
     # logger.info(f"="*50)
 
-    e2e_results = evaluate_reranked_e2e(
+    e2e_results = evaluate_reranked_e2e_optimized(
         gold_df=df_gold_answers,
         retrieve_fn=retrieve_top_k_hybrid,
-        answer_fn=answer_fn,
         top_k_shown=20,
         top_k_retrieved=100,
-        plot_loc="reranked_e2e",
+        top_k_reranked=10,
     )
     logger.info(f"E2E Results: {e2e_results}")
     E2E_RESULTS_PATH = "/root/autodl-tmp/results/csv/cuad_v1_e2e_reranked.csv"

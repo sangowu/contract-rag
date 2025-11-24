@@ -1,8 +1,6 @@
 from typing import List, Callable, Tuple, Dict
 from tqdm import tqdm
 import ast  
-import torch
-import gc
 import pandas as pd
 from loguru import logger
 
@@ -11,43 +9,8 @@ from src.utils.query_builder import build_query
 from src.utils.eval_answers import eval_one
 from config.cuad_meta import get_answer_type
 from src.rag.retrieval import rerank_results
-
-def clear_gpu_memory():
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
-    gc.collect()
-    logger.info("GPU memory cleared")
-
-def release_all_models():
-    try:
-        import src.rag.embedding as embedding_module
-        if hasattr(embedding_module, '_model') and embedding_module._model is not None:
-            del embedding_module._model
-            embedding_module._model = None
-            logger.info("Embedding model released")
-        
-        if hasattr(embedding_module, '_collection'):
-            embedding_module._collection = None
-        
-        import src.inference.llm_inference as llm_module
-        if hasattr(llm_module, 'transformers_model') and llm_module.transformers_model is not None:
-            del llm_module.transformers_model
-            llm_module.transformers_model = None
-            logger.info("Transformers model released")
-        
-        if hasattr(llm_module, 'tokenizer'):
-            llm_module.tokenizer = None
-        
-        for _ in range(3):
-            clear_gpu_memory()
-        
-        logger.success("All models released and GPU memory cleared")
-        
-    except Exception as e:
-        logger.warning(f"Failed to release some models: {e}")
-        clear_gpu_memory()
-
+from src.inference.llm_inference import llm_generate_full_dataset
+from src.utils.model_loading import release_all_models
 
 def hit_at_k(retrieved: List[str], gold: List[str], k: int = 10) -> int:
     """
@@ -258,8 +221,8 @@ def evaluate_reranked_e2e(
     gold_df: pd.DataFrame,
     retrieve_fn: Callable[[str, int], List[Dict[str, str]]],
     answer_fn: Callable[[str, List[Dict[str, str]]], str],
-    top_k_shown: int = 10,
-    top_k_retrieved: int = 50,
+    top_k_shown: int = 20,
+    top_k_retrieved: int = 100,
     top_k_reranked: int | None = None,
     plot: bool = True,
     plot_loc: str = "reranked_e2e",
@@ -274,7 +237,7 @@ def evaluate_reranked_e2e(
     rrs = []
     recalls = []
     records = []
-
+    final_k = top_k_reranked if top_k_reranked is not None else top_k_shown
     for _, row in tqdm(gold_df.iterrows(), total=len(gold_df), desc="evaluating reranked e2e"):
         category = row["clause_type"]
         gold_answer = row["gold_answer_text"]
@@ -285,15 +248,14 @@ def evaluate_reranked_e2e(
         else:
             query = build_query(category)
 
-        retrieved_data: List[Dict[str, str]] = retrieve_fn(query, top_k_shown=top_k_shown, top_k_retrieval=top_k_retrieved, file_name=file_name)
-        # retrieved_ids = [data['chunk_id'] for data in retrieved_data]
-
-        reranked_data = rerank_results(query, retrieved_data, top_k=top_k_reranked)
+        retrieved_data: List[Dict[str, str]] = retrieve_fn(query, top_k_retrieval=top_k_retrieved, file_name=file_name)
+        
+        reranked_data = rerank_results(query, retrieved_data, top_k=final_k)
         reranked_ids = [data['chunk_id'] for data in reranked_data]
 
-        hit = hit_at_k(reranked_ids, gold_chunk_ids, top_k_shown)
-        rr = mrr_at_k(reranked_ids, gold_chunk_ids, top_k_shown)
-        rec = recall_at_k(reranked_ids, gold_chunk_ids, top_k_shown)
+        hit = hit_at_k(reranked_ids, gold_chunk_ids, final_k)
+        rr = mrr_at_k(reranked_ids, gold_chunk_ids, final_k)
+        rec = recall_at_k(reranked_ids, gold_chunk_ids, final_k)
 
         hits.append(hit)
         rrs.append(rr)
@@ -314,6 +276,107 @@ def evaluate_reranked_e2e(
             "recall@k": rec,
             "reranked_score": reranked_data[0]['rerank_score'] if reranked_data else 0.0,
             **ans_metrics,   
+        })
+
+    if plot:
+        log_hits = pd.DataFrame(hits, columns=['hits'])
+        log_rrs = pd.DataFrame(rrs, columns=['rrs'])
+        log_recalls = pd.DataFrame(recalls, columns=['recalls'])
+        plot_hits(log_hits, plot_loc)
+        plot_rrs(log_rrs, plot_loc)
+        plot_recalls(log_recalls, plot_loc)
+    else:
+        logger.info("No plots generated")
+
+    result_df = pd.DataFrame(records)
+    return result_df
+
+def evaluate_reranked_e2e_optimized(
+    gold_df: pd.DataFrame,
+    retrieve_fn: Callable[[str, int], List[Dict[str, str]]],
+    top_k_shown: int = 20,
+    top_k_retrieved: int = 100,
+    top_k_reranked: int = 5,
+    plot: bool = True,
+    plot_loc: str = "reranked_e2e_batch",
+) -> pd.DataFrame:
+
+    if len(gold_df) > 0 and isinstance(gold_df['gold_chunk_ids'].iloc[0], str):
+        gold_df = gold_df.copy()
+        gold_df['gold_chunk_ids'] = gold_df['gold_chunk_ids'].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+        )
+
+    hits, rrs, recalls = [], [], []
+    
+    logger.info("Stage 1: Starting Retrieval and Reranking...")
+    
+    prepared_prompts: List[str] = []
+    metadata_list: List[Dict] = []
+
+    for _, row in tqdm(gold_df.iterrows(), total=len(gold_df), desc="Retrieving & Reranking"):
+        category = row["clause_type"]
+        gold_answer = row["gold_answer_text"]
+        gold_chunk_ids = row["gold_chunk_ids"]
+        file_name = row["file_name"]
+        
+        query = row["query"] if "query" in row and isinstance(row["query"], str) else build_query(category)
+
+        retrieved_data = retrieve_fn(
+            query, top_k_retrieval=top_k_retrieved, file_name=file_name
+        )
+        
+        reranked_data = rerank_results(query, retrieved_data, top_k=top_k_reranked)
+        
+        reranked_ids = [data['chunk_id'] for data in reranked_data]
+        hit = hit_at_k(reranked_ids, gold_chunk_ids, top_k_reranked)
+        rr  = mrr_at_k(reranked_ids, gold_chunk_ids, top_k_reranked)
+        rec = recall_at_k(reranked_ids, gold_chunk_ids, top_k_reranked)
+
+        hits.append(hit)
+        rrs.append(rr)
+        recalls.append(rec)
+
+        ctx_chunks = [data.get("clause_text", "") for data in reranked_data]
+        context = "\n\n".join(ctx_chunks)
+        prompt = f"""
+Question: {query}
+Relevant contract clauses: {context}
+Answer as concisely as possible.
+""".strip()
+        
+        prepared_prompts.append(prompt)
+        metadata_list.append({
+            "category": category,
+            "query": query,
+            "gold_answer": gold_answer,
+            "hit": hit,
+            "rr": rr,
+            "rec": rec,
+            "reranked_score": reranked_data[0]['rerank_score'] if reranked_data else 0.0,
+        })
+
+    logger.info("Stage 1 Complete. Releasing Retrieval/Rerank models to free GPU for vLLM...")
+    release_all_models() 
+    
+    logger.info(f"Stage 2: vLLM Batch Inference on {len(prepared_prompts)} prompts...")
+    
+    model_answers = llm_generate_full_dataset(prepared_prompts)
+
+    records = []
+    for meta, ans in zip(metadata_list, model_answers):
+        ans_metrics = eval_one(meta["category"], meta["gold_answer"], ans)
+        records.append({
+            "category": meta["category"],
+            "answer_type": get_answer_type(meta["category"]),
+            "query": meta["query"],
+            "gold_answer": meta["gold_answer"],
+            "model_answer": ans,
+            "hit@k": meta["hit"],
+            "rr@k": meta["rr"],
+            "recall@k": meta["rec"],
+            "reranked_score": meta["reranked_score"],
+            **ans_metrics,
         })
 
     if plot:
