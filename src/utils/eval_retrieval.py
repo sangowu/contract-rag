@@ -121,7 +121,10 @@ def evaluate_retrieval(
         gold_chunk_ids = row['gold_chunk_ids']
         gold_chunk_ids = [str(cid) for cid in gold_chunk_ids]
         retrieved_data: List[Dict[str, str]] = retrieve_fn(query, k=top_k_retrieved, file_name=file_name)
-        retrieved_ids = [str(data['chunk_id']) for data in retrieved_data]
+        retrieved_ids = [
+            str(data.get("parent_id", data["chunk_id"]))
+            for data in retrieved_data
+        ]
         hits.append(hit_at_k(retrieved_ids, gold_chunk_ids, top_k_shown))
         rrs.append(mrr_at_k(retrieved_ids, gold_chunk_ids, top_k_shown))
         recalls.append(recall_at_k(retrieved_ids, gold_chunk_ids, top_k_shown))
@@ -178,8 +181,10 @@ def evaluate_e2e(
             query = build_query(category)
 
         retrieved_data: List[Dict[str, str]] = retrieve_fn(query, top_k_shown=top_k_shown, top_k_retrieval=top_k_retrieved, file_name=file_name)
-        retrieved_ids = [data['chunk_id'] for data in retrieved_data]
-
+        retrieved_ids = [
+            str(data.get("parent_id", data["chunk_id"]))
+            for data in retrieved_data
+        ]
         hit = hit_at_k(retrieved_ids, gold_chunk_ids, top_k_shown)
         rr = mrr_at_k(retrieved_ids, gold_chunk_ids, top_k_shown)
         rec = recall_at_k(retrieved_ids, gold_chunk_ids, top_k_shown)
@@ -251,8 +256,10 @@ def evaluate_reranked_e2e(
         retrieved_data: List[Dict[str, str]] = retrieve_fn(query, top_k_retrieval=top_k_retrieved, file_name=file_name)
         
         reranked_data = rerank_results(query, retrieved_data, top_k=final_k)
-        reranked_ids = [data['chunk_id'] for data in reranked_data]
-
+        reranked_ids = [
+            str(data.get("parent_id", data["chunk_id"]))
+            for data in reranked_data
+        ]
         hit = hit_at_k(reranked_ids, gold_chunk_ids, final_k)
         rr = mrr_at_k(reranked_ids, gold_chunk_ids, final_k)
         rec = recall_at_k(reranked_ids, gold_chunk_ids, final_k)
@@ -296,7 +303,7 @@ def evaluate_reranked_e2e_optimized(
     retrieve_fn: Callable[[str, int], List[Dict[str, str]]],
     top_k_shown: int = 20,
     top_k_retrieved: int = 100,
-    top_k_reranked: int = 5,
+    top_k_reranked: int = 10,
     plot: bool = True,
     plot_loc: str = "reranked_e2e_batch",
 ) -> pd.DataFrame:
@@ -328,7 +335,11 @@ def evaluate_reranked_e2e_optimized(
         
         reranked_data = rerank_results(query, retrieved_data, top_k=top_k_reranked)
         
-        reranked_ids = [data['chunk_id'] for data in reranked_data]
+        reranked_ids = [
+            str(data.get("parent_id", data["chunk_id"]))
+            for data in reranked_data
+        ]
+
         hit = hit_at_k(reranked_ids, gold_chunk_ids, top_k_reranked)
         rr  = mrr_at_k(reranked_ids, gold_chunk_ids, top_k_reranked)
         rec = recall_at_k(reranked_ids, gold_chunk_ids, top_k_reranked)

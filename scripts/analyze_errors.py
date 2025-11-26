@@ -11,7 +11,10 @@ VANILLA_OUTPUT_MD = "/root/autodl-tmp/results/md/vanilla_e2e/vanilla_error_cases
 HYBRID_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_hybrid.csv"
 HYBRID_OUTPUT_MD = "/root/autodl-tmp/results/md/hybrid_e2e/hybrid_error_cases.md"
 REANKER_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_reranked.csv"
+REANKER_PARENT_CHILD_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_reranked_parent_child.csv"
 REANKER_OUTPUT_MD = "/root/autodl-tmp/results/md/reranked_e2e/reranked_error_cases.md"
+BATCH_REANKER_OUTPUT_MD = "/root/autodl-tmp/results/md/reranked_e2e_batch/reranked_error_cases_batch.md"
+BATCH_REANKER_PARENT_CHILD_OUTPUT_MD = "/root/autodl-tmp/results/md/reranked_e2e_batch_parent_child/reranked_error_cases_batch_parent_child.md"
 NUM_CATEGORIES = 5
 EXAMPLES_PER_CATEGORY = 5
 
@@ -103,13 +106,13 @@ def main():
     parser.add_argument(
         "--csv",
         type=str,
-        default=REANKER_INPUT_CSV,
-        help="Path to cuad_v1_e2e_reranked.csv",
+        default=REANKER_PARENT_CHILD_INPUT_CSV,
+        help="Path to cuad_v1_e2e_reranked_parent_child.csv",
     )
     parser.add_argument(
         "--out_md",
         type=str,
-        default=REANKER_OUTPUT_MD,
+        default=BATCH_REANKER_PARENT_CHILD_OUTPUT_MD,
         help="Where to save the markdown error report.",
     )
     parser.add_argument(

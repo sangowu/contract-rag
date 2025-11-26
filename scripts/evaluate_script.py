@@ -45,9 +45,10 @@ if __name__ == "__main__":
         top_k_shown=20,
         top_k_retrieved=100,
         top_k_reranked=10,
+        plot_loc="reranked_e2e_batch_parent_child",
     )
     logger.info(f"E2E Results: {e2e_results}")
-    E2E_RESULTS_PATH = "/root/autodl-tmp/results/csv/cuad_v1_e2e_reranked.csv"
+    E2E_RESULTS_PATH = "/root/autodl-tmp/results/csv/cuad_v1_e2e_reranked_parent_child.csv"
     e2e_results.to_csv(E2E_RESULTS_PATH, index=False)
     logger.success(f"Saved e2e evaluation results to {E2E_RESULTS_PATH}")
 
