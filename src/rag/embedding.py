@@ -1,18 +1,22 @@
-import pandas as pd
+import os
+import re
 import pickle
-from typing import List, Dict
-from loguru import logger
-from sentence_transformers import SentenceTransformer
-import re, os, sys, ast, unicodedata, chromadb
+import unicodedata
 from pathlib import Path
-from rank_bm25 import BM25L
+from typing import List, Dict
+
+import chromadb
+import pandas as pd
 from loguru import logger
+from rank_bm25 import BM25L
+from sentence_transformers import SentenceTransformer
 
 CHUNK_PATH = "/root/autodl-tmp/data/processed/CUAD_v1/cuad_v1_chunks.csv"
 GOLD_ANSWERS_PATH = "/root/autodl-tmp/data/answers/CUAD_v1/cuad_v1_gold_answers.csv"
 EMBEDDING_MODEL = "/root/autodl-tmp/model/sentence-transformers/all-MiniLM-L6-v2"
 CHROMA_DB_PATH = "/root/autodl-tmp/data/indexes/embeddings/chroma_db"
 BM25_INDEX_PATH = "/root/autodl-tmp/data/indexes/bm25"
+
 os.makedirs(CHROMA_DB_PATH, exist_ok=True)
 chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
     
@@ -20,15 +24,29 @@ _model = None
 _collection = None
 
 def get_model():
+    """
+    获取embedding模型，固定在GPU1
+    
+    Returns:
+        SentenceTransformer模型对象
+    """
     global _model
     if _model is None:
-        _model = SentenceTransformer(EMBEDDING_MODEL)
+        import torch
+        # 检查GPU1是否可用
+        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+            device = f"cuda:1"  # 使用GPU1
+            logger.info(f"Loading embedding model on GPU1")
+        else:
+            device = "cpu"
+            logger.warning("GPU1 not available, using CPU for embedding model")
+        _model = SentenceTransformer(EMBEDDING_MODEL, device=device)
     return _model  
 
 def get_collection():
     global _collection
     if _collection is None:
-        _collection = chroma_client.get_collection(name="cuad_chunks")
+        _collection = chroma_client.get_or_create_collection(name="cuad_chunks")
     return _collection
 
 def normalize_text(s: str) -> str:
@@ -57,7 +75,6 @@ def build_bm25_index(chunk_texts: List[str]):
 
 def parent_child_chunking(
     df_chunk: pd.DataFrame,
-    parent_chunk_size: int = 2000,
     child_chunk_size: int = 500,
     overlap: int = 100
 ) -> Dict[str, List[str]]:
@@ -86,7 +103,7 @@ def parent_child_chunking(
         child_idx = 0
 
         while start < text_len:
-            end = min(start + parent_chunk_size, text_len)
+            end = min(start + child_chunk_size, text_len)
             child_text = parent_text[start:end].strip()
             if not child_text:
                 break
@@ -110,7 +127,8 @@ def parent_child_chunking(
 
 def initialize_embeddings():
     df_chunk = pd.read_csv(CHUNK_PATH)
-    model = SentenceTransformer(EMBEDDING_MODEL)
+    model = get_model()
+    collection = get_collection()
 
     chunking = parent_child_chunking(
         df_chunk,
@@ -118,7 +136,6 @@ def initialize_embeddings():
         overlap=100,
     )
 
-    parent_ids = chunking["parent_ids"]
     parent_texts = chunking["parent_texts"]
     child_ids = chunking["child_ids"]
     child_texts = chunking["child_texts"]
@@ -135,7 +152,7 @@ def initialize_embeddings():
         for _, row in df_chunk.iterrows()
     }
 
-    build_bm25_index(child_texts)
+    build_bm25_index(parent_texts)
 
     embeddings = model.encode(
         child_texts,
@@ -144,8 +161,6 @@ def initialize_embeddings():
         normalize_embeddings=True,
         convert_to_numpy=True,
     )
-
-    collection = chroma_client.get_or_create_collection(name="cuad_chunks")
 
     batch_size = 4096
     total_items = len(child_ids)

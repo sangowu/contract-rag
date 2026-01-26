@@ -16,7 +16,7 @@ df_gold_answers = pd.read_csv(GOLD_ANSWERS_PATH)
 if __name__ == "__main__":
     logger.info("Starting LLM script...")
     # initialize_embeddings()
-    max_queries = 3
+    max_queries = 2
     for i, row in df_gold_answers.iterrows():
         if i >= max_queries:
             break

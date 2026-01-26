@@ -9,11 +9,22 @@ MODEL_NAME = "/root/autodl-tmp/model/Qwen3-8B"
 
 def llm_generate_full_dataset(
     prompts: List[str],
-    max_tokens: int = 512, 
+    max_tokens: int = 1024, 
     temperature: float = 0.0, 
-    gpu_util: float = 0.90,   
+    gpu_util: float = 0.85,   
 ) -> List[str]:
+    """
+    使用vLLM批量生成回答
     
+    Args:
+        prompts: 提示词列表
+        max_tokens: 最大生成token数
+        temperature: 采样温度
+        gpu_util: GPU内存利用率 (默认0.85)
+    
+    Returns:
+        生成的回答列表
+    """
     logger.info(f"Initializing vLLM for {len(prompts)} prompts...")
     
     tokenizer = get_tokenizer(MODEL_NAME, trust_remote_code=True)
@@ -48,13 +59,27 @@ def llm_generate_batch(
     top_p: float = 0.95,
     max_input_len: int = 4096,
 ) -> List[str]:
-
+    """
+    批量生成回答
+    
+    Args:
+        prompts: 提示词列表
+        use_vllm: 是否使用vLLM
+        batch_size: 批处理大小
+        max_tokens: 最大生成token数
+        temperature: 采样温度
+        top_p: nucleus采样参数
+        max_input_len: 最大输入长度
+    
+    Returns:
+        生成的回答列表
+    """
     tokenizer = get_tokenizer(MODEL_NAME)
 
     batch_texts = build_chat_prompts(tokenizer, prompts)
 
     if use_vllm:
-        llm = get_vllm(MODEL_NAME, dtype="auto", max_len=max_input_len, gpu_util=0.75)
+        llm = get_vllm(MODEL_NAME, dtype="auto", max_len=max_input_len, gpu_util=0.85)
         sampling_params = SamplingParams(
             max_tokens=max_tokens,
             temperature=temperature,
@@ -107,4 +132,15 @@ def llm_generate(
     use_vllm: bool = False,
     **kwargs
 ) -> str:
+    """
+    生成单个回答
+    
+    Args:
+        prompt: 提示词
+        use_vllm: 是否使用vLLM
+        **kwargs: 其他参数传递给llm_generate_batch
+    
+    Returns:
+        生成的回答
+    """
     return llm_generate_batch([prompt], use_vllm=use_vllm, batch_size=1, **kwargs)[0]
