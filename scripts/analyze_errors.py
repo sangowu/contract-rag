@@ -6,6 +6,7 @@ import pandas as pd
 from loguru import logger
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from src.utils.seed_utils import get_seed
 VANILLA_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_vanilla.csv"
 VANILLA_OUTPUT_MD = "/root/autodl-tmp/results/md/vanilla_e2e/vanilla_error_cases.md"
 HYBRID_INPUT_CSV = "/root/autodl-tmp/results/csv/cuad_v1_e2e_hybrid.csv"
@@ -60,7 +61,7 @@ def generate_error_md(
         if errors.empty:
             errors = df_cat.sort_values("rr@k").head(examples_per_category * 2)
         if len(errors) > examples_per_category:
-            errors = errors.sample(n=examples_per_category, random_state=42)
+            errors = errors.sample(n=examples_per_category, random_state=get_seed())
 
         for i, row_ex in enumerate(errors.to_dict("records"), start=1):
             lines.append(f"### Example {i}")

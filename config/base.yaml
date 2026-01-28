@@ -1,0 +1,216 @@
+# =============================================================================
+# CUAD 合同助手 - 基础配置 (所有环境共享)
+# =============================================================================
+
+app:
+  name: "CUAD Assistant"
+  version: "1.0.0"
+  project_root: "/root/autodl-tmp"
+
+# -----------------------------------------------------------------------------
+# 全局随机数种子配置 (确保实验可复现)
+# -----------------------------------------------------------------------------
+seed:
+  global_seed: 42           # 全局随机种子
+  torch_seed: 42            # PyTorch 随机种子
+  numpy_seed: 42            # NumPy 随机种子
+  python_seed: 42           # Python random 模块种子
+  cuda_deterministic: true  # CUDA 确定性模式 (可能影响性能)
+
+# -----------------------------------------------------------------------------
+# 模型配置
+# -----------------------------------------------------------------------------
+models:
+  # LLM 配置 (根据 GPU 数量自动选择)
+  llm:
+    # 双 GPU 时使用 8B 模型
+    default:
+      name: "Qwen/Qwen3-8B"
+      path: "${PROJECT_ROOT}/model/Qwen3-8B"
+    # 单 GPU 时使用 4B 模型
+    fallback:
+      name: "Qwen/Qwen3-4B-Instruct-2507"
+      path: "${PROJECT_ROOT}/model/Qwen3-4B-Instruct-2507"
+    # 通用参数
+    max_tokens: 4096
+    temperature: 0.1
+    max_model_len: 8192
+    # GPU 利用率 (由 gpu_manager 动态调整)
+    gpu_memory_utilization:
+      single_gpu: 0.45    # 单 GPU 需与其他模型共享
+      dual_gpu: 0.85      # 双 GPU 时 LLM 独占
+  
+  embedding:
+    name: "Qwen/Qwen3-Embedding-0.6B"
+    path: "${PROJECT_ROOT}/model/Qwen3-Embedding-0.6B"
+    batch_size: 64
+    dimension: 1024
+  
+  reranker:
+    name: "Qwen/Qwen3-Reranker-4B"
+    path: "${PROJECT_ROOT}/model/Qwen3-Reranker-4B"
+    top_k: 20
+
+# -----------------------------------------------------------------------------
+# 数据路径配置
+# -----------------------------------------------------------------------------
+data:
+  base_dir: "${PROJECT_ROOT}/data"
+  raw_path: "${PROJECT_ROOT}/data/raw/CUAD_v1"
+  processed_path: "${PROJECT_ROOT}/data/processed/CUAD_v1"
+  answers_path: "${PROJECT_ROOT}/data/answers/CUAD_v1"
+  gold_standard_path: "${PROJECT_ROOT}/data/gold_standard"
+  cache_path: "${PROJECT_ROOT}/data/cache"
+  
+  # 数据文件
+  files:
+    master_clauses: "master_clauses.csv"
+    chunks: "cuad_v1_chunks.csv"  # 原始预处理 chunks（金标准评估用）
+    gold_answers: "cuad_v1_gold_answers.csv"
+  
+  # PDF 解析数据（仅用于实际应用，评估时禁用）
+  pdf_parsed:
+    enabled: false  # 评估时禁用，使用原始预处理数据以匹配金标准
+    chunks_path: "${PROJECT_ROOT}/data/pdf_parsed_results/all_chunks.csv"
+  
+  # 分块配置
+  chunking:
+    chunk_size: 500
+    chunk_overlap: 100
+
+  # 数据采样配置 (测试模式会覆盖)
+  sampling:
+    enabled: false
+    ratio: 1.0
+    seed: 42
+    cache_enabled: false
+
+# -----------------------------------------------------------------------------
+# 检索配置
+# -----------------------------------------------------------------------------
+retrieval:
+  vector_db:
+    type: "chroma"
+    # 使用原始预处理数据的向量库（与金标准 chunk_id 匹配）
+    persist_directory: "${PROJECT_ROOT}/data/indexes/embeddings/chroma_db"
+    collection_name: "contracts"
+  
+  bm25:
+    # 使用原始预处理数据的 BM25 索引
+    index_path: "${PROJECT_ROOT}/data/indexes/bm25"
+    index_file: "bm25_index.pkl"  # 原始索引文件
+  
+  hybrid:
+    enabled: true
+    vector_weight: 0.6
+    bm25_weight: 0.4
+    top_k: 50
+  
+  parent_child:
+    enabled: true
+    parent_chunk_size: 1500
+    child_chunk_size: 500
+    overlap: 100
+  
+  rerank:
+    enabled: true
+    top_k: 10
+
+# -----------------------------------------------------------------------------
+# 语义缓存配置
+# -----------------------------------------------------------------------------
+cache:
+  semantic:
+    enabled: false
+    backend: "redis"
+    similarity_threshold: 0.95
+    ttl_seconds: 86400
+    max_entries: 10000
+  
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+    password: ""
+
+# -----------------------------------------------------------------------------
+# API 服务配置
+# -----------------------------------------------------------------------------
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  cors_origins: ["*"]
+
+# -----------------------------------------------------------------------------
+# 评估配置
+# -----------------------------------------------------------------------------
+evaluation:
+  ragas:
+    enabled: true
+    metrics:
+      - "faithfulness"
+      - "answer_relevancy"
+      - "context_precision"
+      - "context_recall"
+  
+  traditional:
+    metrics:
+      - "f1"
+      - "exact_match"
+      - "recall_at_k"
+      - "mrr"
+      - "hit_at_k"
+    k_values: [1, 3, 5, 10, 20]
+  
+  wandb:
+    enabled: false
+    project: "cuad-assistant"
+    entity: ""
+
+  output:
+    results_dir: "${PROJECT_ROOT}/results"
+    csv_dir: "${PROJECT_ROOT}/results/csv"
+    plots_dir: "${PROJECT_ROOT}/results/plots"
+    reports_dir: "${PROJECT_ROOT}/results/md"
+
+# -----------------------------------------------------------------------------
+# 日志配置
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "${PROJECT_ROOT}/logs/app.log"
+  console: true
+
+# -----------------------------------------------------------------------------
+# PDF 解析配置
+# -----------------------------------------------------------------------------
+pdf:
+  parser:
+    backend: "pymupdf"              # pymupdf / marker
+    max_pages: 500                  # 最大页数限制
+    max_file_size_mb: 100           # 最大文件大小 (MB)
+    timeout_seconds: 300            # 解析超时时间
+  
+  ocr:
+    enabled: true
+    engine: "paddleocr"             # paddleocr / tesseract
+    languages: ["en", "ch"]
+    confidence_threshold: 0.6
+    fallback_on_failure: true       # OCR失败时返回空文本
+  
+  table:
+    enabled: true
+    max_tokens: 2000                # 表格最大token数
+    summary_enabled: true           # 是否生成摘要
+    context_chars: 100              # 上下文字符数
+  
+  bbox:
+    enabled: true
+    granularity: "line"             # word / line / block
+    include_images: false           # 是否包含图片区域
+  
+  output:
+    format: "markdown"              # markdown / text / html
+    preserve_layout: true           # 保留版面布局

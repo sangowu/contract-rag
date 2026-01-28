@@ -87,10 +87,29 @@ Performance on CUAD dataset (End-to-End Evaluation):
 
 ## Configuration
 
-Edit `config/config.yaml` to adjust:
-- Model parameters
-- Retrieval settings
-- Evaluation configuration
+The project uses a hierarchical configuration system:
+
+- **`config/base.yaml`**: Base configuration shared across all environments
+- **`config/{mode}.yaml`**: Environment-specific overrides (test/dev/prod)
+
+Edit these files to adjust:
+- Model parameters (LLM, Embedding, Reranker)
+- Retrieval settings (Hybrid search, BM25, Vector DB)
+- PDF parsing configuration
+- Evaluation metrics
+- API and logging settings
+
+**Usage**:
+```bash
+# Test mode (loads base.yaml + test.yaml)
+python scripts/run_api.py --mode test
+
+# Dev mode (loads base.yaml + dev.yaml)
+python scripts/run_api.py --mode dev
+
+# Prod mode (loads base.yaml + prod.yaml)
+python scripts/run_api.py --mode prod
+```
 
 ## Usage Examples
 
