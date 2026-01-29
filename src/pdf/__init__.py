@@ -48,6 +48,14 @@ from src.pdf.exceptions import (
     UnsupportedFormatError,
 )
 
+from src.pdf.ocr_engine import (
+    OCREngine,
+    OCRResult,
+    OCRLine,
+    ocr_image,
+    pdf_page_to_image,
+)
+
 __all__ = [
     # 主类
     'PDFParser',
@@ -73,4 +81,10 @@ __all__ = [
     'OCRFailedError',
     'TableExtractionError',
     'UnsupportedFormatError',
+    # OCR
+    'OCREngine',
+    'OCRResult',
+    'OCRLine',
+    'ocr_image',
+    'pdf_page_to_image',
 ]

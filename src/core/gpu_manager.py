@@ -88,9 +88,9 @@ class GPUManager:
     # 模型配置
     MODEL_CONFIGS = {
         "single_gpu": {
-            "name": "Qwen/Qwen3-4B-Instruct-2507",
-            "path_key": "llm_4b_path",  # 从配置文件读取
-            "gpu_util": 0.45,  # 单 GPU 需要与其他模型共享
+            "name": "Qwen/Qwen3-8B", # 改为本地存在的 8B
+            "path_key": "llm_8b_path",
+            "gpu_util": 0.80, # 4090 显存足够
         },
         "dual_gpu": {
             "name": "Qwen/Qwen3-8B",

@@ -168,13 +168,13 @@ class DataConfig:
 class VectorDBConfig:
     type: str = "chroma"
     persist_directory: str = ""
-    collection_name: str = "contracts"
+    collection_name: str = "pdf-parser"
 
 
 @dataclass
 class BM25Config:
     index_path: str = ""
-    index_file: str = "bm25_pdf_index.pkl"  # 默认使用 PDF 索引
+    index_file: str = "bm25_omnidoc_index.pkl"  
 
 
 @dataclass
@@ -259,7 +259,7 @@ class TraditionalMetricsConfig:
 @dataclass
 class WandBConfig:
     enabled: bool = False
-    project: str = "cuad-assistant"
+    project: str = "pdf-parser-assistant"
     entity: str = ""
 
 

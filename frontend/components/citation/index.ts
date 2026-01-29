@@ -1,1 +1,0 @@
-export { CitationBadge } from './CitationBadge';

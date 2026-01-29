@@ -40,6 +40,7 @@ datasets
 
 # PDF Processing
 pymupdf
+paddleocr
 
 # Visualization
 matplotlib>=3.7.0
